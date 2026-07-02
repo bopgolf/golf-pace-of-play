@@ -176,7 +176,9 @@ details summary{padding:12px 14px;font-weight:700;cursor:pointer;list-style:none
 details summary::after{content:"+";font-weight:800}
 details[open] summary::after{content:"–"}
 details .inner{padding:0 14px 14px}
-.drawrow{display:grid;grid-template-columns:86px 1fr 34px;gap:6px;margin-bottom:6px;align-items:center}
+.drawrow{display:grid;grid-template-columns:64px 46px 50px 1fr 28px;gap:5px;margin-bottom:6px;align-items:center}
+.drawrow.drawhead{margin-bottom:2px}
+.drawrow.drawhead span{font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
 .drawrow input{padding:8px}
 .drawrow button{padding:6px;background:transparent;color:var(--red);font-size:1.1rem}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
@@ -191,13 +193,26 @@ details .inner{padding:0 14px 14px}
 <main>
 <div class="banner" id="storeBanner">Storage is unavailable in this browser view — data will not survive a refresh. Hosted on your own site (e.g. GitHub Pages) everything saves automatically.</div>
 
+<!-- ============ ROLE CHOICE ============ -->
+<section class="screen" id="scr-role">
+  <h2>Who's using this phone?</h2>
+  <div class="card">
+    <button class="big" onclick="chooseOfficial()">Official / Committee</button>
+    <p class="muted small" style="margin:8px 2px 0">Full access: draw setup, field monitoring, timing every group, log and records. Protected by an admin PIN.</p>
+  </div>
+  <div class="card">
+    <button class="big ghost" onclick="choosePlayer()">Player / Parent</button>
+    <p class="muted small" style="margin:8px 2px 0">See the field, pick your group, and record your own hole-out times. Event setup stays locked.</p>
+  </div>
+</section>
+
 <!-- ============ FIELD (official) ============ -->
 <section class="screen" id="scr-field">
   <h2>Field position</h2>
   <div class="strip" id="strip"></div>
   <div id="fieldList"></div>
   <div class="card muted small" id="fieldEmpty" style="display:none">
-    No groups yet. Load the draw under the <b>Draw</b> tab, then record times here or in Player view. Tap any group to open its timing sheet.
+    No groups yet. Officials: load the draw under the <b>Draw</b> tab. Players: load the official's event file from the <b>Player</b> tab.
   </div>
 </section>
 
@@ -215,7 +230,9 @@ details .inner{padding:0 14px 14px}
       <select id="myGroup" onchange="setMyGroup(this.value)"></select>
     </label>
   </div>
+  <div id="playerEvent"></div>
   <div id="playerPanel"></div>
+  <p class="muted small" style="text-align:center;margin-top:18px"><a href="#" onclick="chooseOfficial();return false" style="color:var(--ink-soft)">Official sign-in</a></p>
 </section>
 
 <!-- ============ DRAW / SETUP ============ -->
@@ -226,6 +243,7 @@ details .inner{padding:0 14px 14px}
     <div class="row">
       <label class="f"><span>Date</span><input id="setDate" type="date"></label>
       <label class="f"><span>Tee interval (min)</span><input id="setInterval" type="number" min="6" max="15" step="1"></label>
+      <label class="f"><span>Course</span><select id="setCourse"><option value="18">18 holes</option><option value="9">9 holes</option></select></label>
     </div>
     <button class="ghost" onclick="saveEventSettings()">Save event details</button>
   </div>
@@ -238,7 +256,7 @@ details .inner{padding:0 14px 14px}
   </div>
 
   <div class="card" id="draw-paste">
-    <p class="muted small" style="margin-bottom:8px">Copy the draw from anywhere — DotGolf, a website, Word, an email — and paste it here. Lines with a tee time start a new group; names on that line and the lines below join it.</p>
+    <p class="muted small" style="margin-bottom:8px">Copy the draw from anywhere — DotGolf, a website, Word, an email — and paste it here. Lines with a tee time start a new group; names on that line and the lines below join it. Start holes ("Tee 10") and round length ("9 holes", "Futures 18") are picked up too — and everything is editable before you confirm.</p>
     <textarea id="pasteBox" rows="8" placeholder="8:00 am  J Smith, A Brown, T Wilson&#10;8:09 am  K Patel, M Ngata, R Green&#10;..."></textarea>
     <button class="big" style="margin-top:10px" onclick="parsePaste()">Read draw from text</button>
   </div>
@@ -297,6 +315,12 @@ details .inner{padding:0 14px 14px}
 
 <!-- ============ RECORDS / MORE ============ -->
 <section class="screen" id="scr-more">
+  <h2>Hand this phone over</h2>
+  <div class="card">
+    <p class="muted small" style="margin-bottom:10px">Locks the app to player/parent mode — no access to setup, log, records or erase. Your admin PIN gets back in via "Official sign-in" on the Player screen.</p>
+    <button class="ghost" onclick="lockToPlayer()">Lock to player mode</button>
+  </div>
+
   <h2>Finish this round</h2>
   <div class="card">
     <p class="muted small" style="margin-bottom:10px">Archives every group's times into Records and clears the live field, ready for the next round. The draw and settings are kept.</p>
@@ -338,12 +362,21 @@ let mem = null; // in-memory fallback
 function blank(){
   return {
     settings:{ name:"", date:new Date().toISOString().slice(0,10), interval:9,
+               courseHoles:18, pin:null,
                timePar:DEFAULT_TP.slice(), thAmber:3, thRed:8 },
-    groups:[],           // {id,name,players:[],start:"HH:MM",fin:[minOfDay|null x18],lastStatus}
+    role:null,           // null = not chosen yet | 'official' | 'player'
+    groups:[],           // {id,name,players:[],start:"HH:MM",startHole,holes,fin:[minOfDay|null],lastStatus}
     log:[],              // {t:minOfDay, dt:iso, g:groupName, type:'auto'|'note', msg, sev}
     records:[],          // archived rounds
     myGroup:null
   };
+}
+function migrate(s){
+  s.role=s.role??null;
+  s.settings.courseHoles=s.settings.courseHoles||18;
+  s.settings.pin=s.settings.pin||null;
+  (s.groups||[]).forEach(g=>{ g.startHole=g.startHole||1; g.holes=g.holes||18; });
+  return s;
 }
 function load(){
   try{ const raw=localStorage.getItem('pace-v1'); if(raw) return JSON.parse(raw); }
@@ -354,10 +387,21 @@ function save(){
   try{ localStorage.setItem('pace-v1', JSON.stringify(S)); }
   catch(e){ mem=S; document.getElementById('storeBanner').style.display='block'; }
 }
-let S = load();
+let S = migrate(load());
 
 /* ================= HELPERS ================= */
 const $ = id=>document.getElementById(id);
+const CH = ()=>+S.settings.courseHoles||18;              // holes on the course
+function gHoles(g){ return +g.holes || (CH()===9?9:18); } // holes this group plays
+/* k-th hole played (k=0-based) for a group starting on g.startHole,
+   wrapping past the last hole: start 10 -> 10..18 then 1..9 */
+function holeSeq(g,k){ return (((g.startHole||1)-1+k) % CH())+1; }
+/* time par allowed for this group's first n holes, in play order */
+function cumParG(g,n){
+  let t=0; for(let k=0;k<n;k++) t+= +S.settings.timePar[(((g.startHole||1)-1+k)%CH())] || 14;
+  return t;
+}
+function parG(g){ return cumParG(g,gHoles(g)); }
 function nowMin(){ const d=new Date(); return d.getHours()*60+d.getMinutes()+d.getSeconds()/60; }
 function hm(min){ if(min==null) return "–";
   min=((min%1440)+1440)%1440;
@@ -376,38 +420,42 @@ function signed(mins){ const r=Math.round(mins); return (r>0?"+":"")+r; }
 function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2200); }
 function cumPar(n){ return S.settings.timePar.slice(0,n).reduce((a,b)=>a+ +b,0); }
-function holesDone(g){ let n=0; while(n<18 && g.fin[n]!=null) n++; return n; }
+/* "Thru" = the LATEST hole with a recorded time. Earlier blanks are allowed,
+   so an official catching up a group that stopped self-recording can enter
+   just the most recent known hole and the status updates from there. */
+function holesDone(g){ const gh=gHoles(g); let n=0; for(let k=0;k<gh;k++) if(g.fin[k]!=null) n=k+1; return n; }
 
 /* ================= POSITION ENGINE =================
    In position (green)  : within thresholds
    Drifting (amber)     : more than thAmber beyond interval / time par
    Out of position (red): more than thRed beyond interval AND behind time par
-   First group is judged on time par alone.                          */
+   The group ahead is the previous group in the draw off the SAME start hole;
+   a group with no one ahead of it is judged on time par alone.            */
+function groupAheadOf(gi){
+  const sh=S.groups[gi].startHole||1;
+  for(let j=gi-1;j>=0;j--) if((S.groups[j].startHole||1)===sh) return S.groups[j];
+  return null;
+}
 function statusOf(gi){
   const g=S.groups[gi];
-  const n=holesDone(g);
+  const n=holesDone(g), gh=gHoles(g);
   const start=toMin(g.start);
-  if(n===0){
-    const st = (start!=null && nowMin()>start+5 && nowMin()<start+400) ? null : null;
-    return {code:'pending', n:0, vsPar:null, gap:null, msg:"Not started"};
-  }
+  if(n===0) return {code:'pending', n:0, vsPar:null, gapEx:null, msg:"Not started"};
   const finish=g.fin[n-1];
-  const vsPar = finish - (start + cumPar(n));          // + = behind time par
+  const vsPar = finish - (start + cumParG(g,n));        // + = behind time par
   let gapEx=null;
-  if(gi>0){
-    const a=S.groups[gi-1];
-    if(a.fin[n-1]!=null){
-      const gap = finish - a.fin[n-1];
-      gapEx = gap - (start - toMin(a.start));           // + = further back than the starting interval
-    }
+  const a=groupAheadOf(gi);
+  if(a && a.fin[n-1]!=null){
+    const gap = finish - a.fin[n-1];
+    gapEx = gap - (start - toMin(a.start));             // + = further back than the starting interval
   }
   const A=+S.settings.thAmber, R=+S.settings.thRed;
   const basis = (gapEx==null) ? vsPar : gapEx;
   let code='green';
   if(basis>A) code='amber';
   if(basis>R) code = (gapEx!=null && vsPar<=0) ? 'amber' : 'red';
-  if(n===18) code='done';
-  return {code, n, vsPar, gapEx, finish};
+  if(n===gh) code='done';
+  return {code, n, gh, vsPar, gapEx, finish};
 }
 function statusWord(c){ return {green:"In position",amber:"Drifting",red:"Out of position",pending:"Not started",done:"Finished"}[c]; }
 
@@ -417,13 +465,14 @@ function refreshStatuses(){
     const st=statusOf(i);
     const prev=g.lastStatus||'pending';
     if(st.code!==prev && st.code!=='pending'){
+      const lbl = st.n>0 ? "hole "+holeSeq(g,st.n-1) : "";
       if(st.code==='red'){
-        logAdd(g.name, `flagged OUT OF POSITION after hole ${st.n} — ${signed(st.vsPar)} min v time par`+(st.gapEx!=null?`, ${signed(st.gapEx)} min beyond interval to group ahead`:""), 'red');
+        logAdd(g.name, `flagged OUT OF POSITION after ${lbl} — ${signed(st.vsPar)} min v time par`+(st.gapEx!=null?`, ${signed(st.gapEx)} min beyond interval to group ahead`:""), 'red');
       }else if(prev==='red'){
-        logAdd(g.name, `back ${st.code==='green'?'in position':'to drifting'} after hole ${st.n} (${signed(st.vsPar)} min v time par)`, 'green');
+        logAdd(g.name, `back ${st.code==='green'?'in position':'to drifting'} after ${lbl} (${signed(st.vsPar)} min v time par)`, 'green');
       }else if(st.code==='done'){
-        const total=g.fin[17]-toMin(g.start);
-        logAdd(g.name, `completed the round in ${Math.floor(total/60)}h ${Math.round(total%60).toString().padStart(2,'0')}m (${signed(st.vsPar)} min v time par)`, st.vsPar<=0?'green':'red');
+        const total=g.fin[gHoles(g)-1]-toMin(g.start);
+        logAdd(g.name, `completed ${gHoles(g)} holes in ${Math.floor(total/60)}h ${Math.round(total%60).toString().padStart(2,'0')}m (${signed(st.vsPar)} min v time par)`, st.vsPar<=0?'green':'red');
       }
       g.lastStatus=st.code;
     }
@@ -436,25 +485,25 @@ function logAdd(gname,msg,sev){
 /* ================= RECORD / EDIT TIMES ================= */
 function recordFinish(gi){
   const g=S.groups[gi], n=holesDone(g);
-  if(n>=18) return;
+  if(n>=gHoles(g)) return;
   g.fin[n]=nowMin();
   refreshStatuses(); save(); renderAll();
-  toast(`${g.name}: hole ${n+1} recorded at ${hm(g.fin[n])}`);
+  toast(`${g.name}: hole ${holeSeq(g,n)} recorded at ${hm(g.fin[n])}`);
 }
 function undoFinish(gi){
   const g=S.groups[gi], n=holesDone(g);
   if(!n) return;
-  if(!confirm(`Remove the hole ${n} time for ${g.name}?`)) return;
+  if(!confirm(`Remove the hole ${holeSeq(g,n-1)} time for ${g.name}?`)) return;
   g.fin[n-1]=null; g.lastStatus=null;
   refreshStatuses(); save(); renderAll();
 }
-function editFinish(gi,h){
+function editFinish(gi,k){
   const g=S.groups[gi];
-  const cur=g.fin[h]!=null?hm(g.fin[h]):"";
-  const v=prompt(`${g.name} — time holed out on ${h+1} (24h HH:MM):`,cur);
+  const cur=g.fin[k]!=null?hm(g.fin[k]):"";
+  const v=prompt(`${g.name} — time holed out on ${holeSeq(g,k)} (24h HH:MM):`,cur);
   if(v===null) return;
-  if(v.trim()===""){ g.fin[h]=null; }
-  else{ const m=toMin(v); if(m==null){ alert("Use HH:MM, e.g. 10:42"); return; } g.fin[h]=m; }
+  if(v.trim()===""){ g.fin[k]=null; }
+  else{ const m=toMin(v); if(m==null){ alert("Use HH:MM, e.g. 10:42"); return; } g.fin[k]=m; }
   g.lastStatus=null; refreshStatuses(); save(); renderAll();
 }
 
@@ -463,17 +512,19 @@ function renderStrip(){
   const el=$('strip');
   if(!S.groups.length){ el.style.display='none'; return; }
   el.style.display='block';
-  const cols=[];
-  // column 0 = tee, then holes 1..18
-  const byCol=Array.from({length:19},()=>[]);
+  const ch=CH();
+  const byCol=Array.from({length:ch+2},()=>[]); // [0] unused, 1..ch holes, ch+1 finished
   S.groups.forEach((g,i)=>{
     const st=statusOf(i);
-    const col = st.code==='pending' ? 0 : Math.min(st.n,18);
+    let col;
+    if(st.code==='pending') col=g.startHole||1;         // waiting on their start tee
+    else if(st.code==='done') col=ch+1;
+    else col=holeSeq(g,st.n);                            // the hole they're now playing
     byCol[col].push({i,g,st});
   });
   let html='<div class="strip-grid">';
-  for(let c=0;c<=18;c++){
-    html+=`<div class="strip-col"><div class="strip-hole">${c===0?'TEE':c}</div>`;
+  for(let c=1;c<=ch+1;c++){
+    html+=`<div class="strip-col"><div class="strip-hole">${c===ch+1?'FIN':c}</div>`;
     byCol[c].forEach(({i,g,st})=>{
       const cls={green:'g',amber:'a',red:'r',pending:'p',done:'d'}[st.code];
       html+=`<div class="dot ${cls}" title="${esc(g.name)}">${i+1}</div>`;
@@ -487,15 +538,17 @@ function renderField(){
   renderStrip();
   const list=$('fieldList');
   $('fieldEmpty').style.display = S.groups.length? 'none':'block';
+  const canOpen = S.role==='official';
   list.innerHTML = S.groups.map((g,i)=>{
     const st=statusOf(i);
+    const setup=`Tee ${g.startHole||1} · ${gHoles(g)} holes`;
     const stats = st.code==='pending'
-      ? `<span>Tee ${hm(toMin(g.start))}</span>`
-      : `<span>Thru <b class="num">${st.n}</b></span>
+      ? `<span>Starts <b class="num">${hm(toMin(g.start))}</b></span><span>${setup}</span>`
+      : `<span>Thru <b class="num">${st.n}/${st.gh}</b></span>
          <span>v par <b class="num ${st.vsPar>0?'tm':'tp'}">${signed(st.vsPar)}</b></span>`+
         (st.gapEx!=null?`<span>v interval <b class="num ${st.gapEx>0?'tm':'tp'}">${signed(st.gapEx)}</b></span>`:``)+
-        `<span>Last <b class="num">${hm(st.finish)}</b></span>`;
-    return `<div class="gcard st-${st.code}" onclick="openGroup(${i})">
+        `<span>${setup}</span><span>Last <b class="num">${hm(st.finish)}</b></span>`;
+    return `<div class="gcard st-${st.code}" ${canOpen?`onclick="openGroup(${i})"`:``} ${canOpen?'':'style="cursor:default"'}>
       <div class="top"><span class="name">${i+1}. ${esc(g.name)}</span><span class="pill">${statusWord(st.code)}</span></div>
       <div class="players">${esc(g.players.join(" · "))||"&nbsp;"}</div>
       <div class="stats">${stats}</div>
@@ -505,20 +558,21 @@ function renderField(){
 
 /* ================= RENDER: GROUP DETAIL ================= */
 let openGi=null;
-function openGroup(i){ openGi=i; renderGroup(); show('group'); }
+function openGroup(i){ if(S.role!=='official') return; openGi=i; renderGroup(); show('group'); }
 function renderGroup(){
   if(openGi==null||!S.groups[openGi]){ show('field'); return; }
-  const g=S.groups[openGi], st=statusOf(openGi), n=st.n;
+  const g=S.groups[openGi], st=statusOf(openGi), n=st.n, gh=gHoles(g);
   const start=toMin(g.start);
   let rows="";
-  for(let h=0;h<18;h++){
-    const due = start!=null ? start+cumPar(h+1) : null;
-    const diff = g.fin[h]!=null&&due!=null ? g.fin[h]-due : null;
-    rows+=`<tr onclick="editFinish(${openGi},${h})">
-      <td class="num">${h+1}</td>
-      <td class="num">${S.settings.timePar[h]}m</td>
+  for(let k=0;k<gh;k++){
+    const hole=holeSeq(g,k);
+    const due = start!=null ? start+cumParG(g,k+1) : null;
+    const diff = g.fin[k]!=null&&due!=null ? g.fin[k]-due : null;
+    rows+=`<tr onclick="editFinish(${openGi},${k})">
+      <td class="num">${hole}</td>
+      <td class="num">${S.settings.timePar[hole-1]}m</td>
       <td class="num">${hm(due)}</td>
-      <td class="num">${g.fin[h]!=null?hm(g.fin[h]):"<span class='muted'>tap to set</span>"}</td>
+      <td class="num">${g.fin[k]!=null?hm(g.fin[k]):"<span class='muted'>tap to set</span>"}</td>
       <td class="num ${diff>0?'tm':diff!=null?'tp':''}">${diff!=null?signed(diff):""}</td>
     </tr>`;
   }
@@ -527,13 +581,13 @@ function renderGroup(){
       <div class="top" style="display:flex;justify-content:space-between;align-items:center">
         <b>${openGi+1}. ${esc(g.name)}</b><span class="pill">${statusWord(st.code)}</span>
       </div>
-      <div class="muted small" style="margin:4px 0 10px">${esc(g.players.join(" · "))} — teed off ${hm(start)}</div>
+      <div class="muted small" style="margin:4px 0 10px">${esc(g.players.join(" · "))} — ${hm(start)} off tee ${g.startHole||1}, ${gh} holes</div>
       ${st.code!=='pending'&&st.code!=='done'?`<div class="small" style="margin-bottom:10px">
         <b class="num ${st.vsPar>0?'tm':'tp'}">${signed(st.vsPar)} min</b> v time par thru ${n}
         ${st.gapEx!=null?` · <b class="num ${st.gapEx>0?'tm':'tp'}">${signed(st.gapEx)} min</b> beyond interval to group ahead`:""}
       </div>`:""}
-      ${n<18?`<button class="big" onclick="recordFinish(${openGi})">Holed out on ${n+1} — record now</button>`:`<div class="pill" style="background:var(--ink);color:#fff">Round complete</div>`}
-      ${n>0&&n<18?`<button class="subtle" style="width:100%;margin-top:8px" onclick="undoFinish(${openGi})">Undo hole ${n}</button>`:""}
+      ${n<gh?`<button class="big" onclick="recordFinish(${openGi})">Holed out on ${holeSeq(g,n)} — record now</button>`:`<div class="pill" style="background:var(--ink);color:#fff">Round complete</div>`}
+      ${n>0&&n<gh?`<button class="subtle" style="width:100%;margin-top:8px" onclick="undoFinish(${openGi})">Undo hole ${holeSeq(g,n-1)}</button>`:""}
     </div>
     <div class="card">
       <table class="holes">
@@ -548,17 +602,24 @@ function setMyGroup(v){ S.myGroup = v===""?null:+v; save(); renderPlayer(); }
 function renderPlayer(){
   const sel=$('myGroup');
   sel.innerHTML=`<option value="">— choose your group —</option>`+
-    S.groups.map((g,i)=>`<option value="${i}" ${S.myGroup===i?'selected':''}>${i+1}. ${esc(g.name)} (${hm(toMin(g.start))})</option>`).join("");
+    S.groups.map((g,i)=>`<option value="${i}" ${S.myGroup===i?'selected':''}>${i+1}. ${esc(g.name)} — ${hm(toMin(g.start))}, tee ${g.startHole||1}</option>`).join("");
+  // Player phones need the event without touching setup: load the official's export here
+  $('playerEvent').innerHTML = S.role==='player' ? `
+    <div class="card small">
+      <b>${S.groups.length? esc(S.settings.name||"Event loaded")+" — "+S.groups.length+" groups" : "No event on this phone yet"}</b>
+      <p class="muted" style="margin:6px 0 10px">${S.groups.length? "Loaded by the official. To refresh it, load their latest event file." : "Ask the official to share the event file (More → Export on their phone), then load it here."}</p>
+      <button class="ghost" onclick="document.getElementById('importBox').click()">Load event file</button>
+    </div>` : "";
   const p=$('playerPanel');
   if(S.myGroup==null||!S.groups[S.myGroup]){ p.innerHTML=`<div class="card muted small">Pick your group above. Then tap the button each time your group holes out — the app tells you where you stand.</div>`; return; }
-  const gi=S.myGroup, g=S.groups[gi], st=statusOf(gi), n=st.n;
+  const gi=S.myGroup, g=S.groups[gi], st=statusOf(gi), n=st.n, gh=gHoles(g);
   const start=toMin(g.start);
   let detail="", target="";
   if(st.code==='pending'){
-    detail=`Tee time ${hm(start)}. Tap below as you hole out on 1.`;
+    detail=`Tee time ${hm(start)} on hole ${g.startHole||1} (${gh} holes). Tap below as you hole out on ${holeSeq(g,0)}.`;
   }else if(st.code==='done'){
-    const total=g.fin[17]-start;
-    detail=`Round of ${Math.floor(total/60)}h ${Math.round(total%60)}m — ${signed(st.vsPar)} min v time par.`;
+    const total=g.fin[gh-1]-start;
+    detail=`${gh} holes in ${Math.floor(total/60)}h ${Math.round(total%60)}m — ${signed(st.vsPar)} min v time par.`;
   }else{
     const behind = st.vsPar;
     detail = behind>0
@@ -569,14 +630,15 @@ function renderPlayer(){
         ? `<br>Gap to the group ahead is <b class="num">${Math.round(st.gapEx)} min more</b> than your starting interval.`
         : `<br>You're holding your starting interval to the group ahead.`;
     }
-    if(n<18){ target=`Hole out on ${n+1} by <b class="num">${hm(start+cumPar(n+1))}</b> to be on time par.`; }
+    if(n<gh){ target=`Hole out on ${holeSeq(g,n)} by <b class="num">${hm(start+cumParG(g,n+1))}</b> to be on time par.`; }
   }
   let hist="";
   if(n>0){
     hist=`<div class="card"><table class="holes"><tr><th>Hole</th><th>Holed out</th><th>+/− par</th></tr>`+
-      Array.from({length:n},(_,h)=>{
-        const diff=g.fin[h]-(start+cumPar(h+1));
-        return `<tr onclick="editFinish(${gi},${h})"><td class="num">${h+1}</td><td class="num">${hm(g.fin[h])}</td><td class="num ${diff>0?'tm':'tp'}">${signed(diff)}</td></tr>`;
+      Array.from({length:n},(_,k)=>{
+        if(g.fin[k]==null) return `<tr onclick="editFinish(${gi},${k})"><td class="num">${holeSeq(g,k)}</td><td class="muted">– tap to set</td><td></td></tr>`;
+        const diff=g.fin[k]-(start+cumParG(g,k+1));
+        return `<tr onclick="editFinish(${gi},${k})"><td class="num">${holeSeq(g,k)}</td><td class="num">${hm(g.fin[k])}</td><td class="num ${diff>0?'tm':'tp'}">${signed(diff)}</td></tr>`;
       }).join("")+`</table></div>`;
   }
   p.innerHTML=`
@@ -585,8 +647,8 @@ function renderPlayer(){
       <div class="detail">${detail}</div>
       ${target?`<div class="target">${target}</div>`:""}
     </div>
-    ${n<18?`<button class="big" onclick="recordFinish(${gi})">We holed out on ${n+1}</button>`:""}
-    ${n>0&&n<18?`<button class="subtle" style="width:100%;margin-top:8px" onclick="undoFinish(${gi})">Undo hole ${n}</button>`:""}
+    ${n<gh?`<button class="big" onclick="recordFinish(${gi})">We holed out on ${holeSeq(g,n)}</button>`:""}
+    ${n>0&&n<gh?`<button class="subtle" style="width:100%;margin-top:8px" onclick="undoFinish(${gi})">Undo hole ${holeSeq(g,n-1)}</button>`:""}
     ${hist}`;
 }
 
@@ -597,8 +659,23 @@ function drawTab(t){
     $('dt-'+x).classList.toggle('on',x===t);
   });
 }
+/* Pull start hole ("Tee 10", "10th tee", "Start hole 10") and round length
+   ("9 holes", "18 Holes", "Futures 18", "F9") out of a draw line. */
+function scanMeta(cur,line){
+  let m=line.match(/\bfutures?\s*(9|18|27|36)\b/i);
+  if(m){ cur.holes=+m[1]; line=line.replace(m[0]," "); }
+  m=line.match(/\b(9|18|27|36)\s*holes?\b/i);
+  if(m){ cur.holes=+m[1]; line=line.replace(m[0]," "); }
+  m=line.match(/\bF(9|18)\b/);
+  if(m){ cur.holes=+m[1]; line=line.replace(m[0]," "); }
+  m=line.match(/\b(\d{1,2})(?:st|nd|rd|th)\s*(?:tee|hole)\b/i);
+  if(m){ cur.startHole=+m[1]; line=line.replace(m[0]," "); }
+  m=line.match(/\b(?:tee|start(?:ing)?(?:\s*hole)?|hole)\s*#?\s*(\d{1,2})\b/i);
+  if(m){ cur.startHole=+m[1]; line=line.replace(m[0]," "); }
+  return line;
+}
 const TIME_RE=/\b(\d{1,2})[:.](\d{2})\s*(am|pm)?\b/i;
-const NOISE=/^(tee|hole|time|start|draw|round|group|match|players?|name|club|hcp|handicap|index|div(ision)?|grade|course|page|\d+(\.\d+)?)$/i;
+const NOISE=/^(tee|hole|holes|time|start|draw|round|group|match|players?|name|club|hcp|handicap|index|div(ision)?|grade|course|page|futures?|key|code|\d+(\.\d+)?)$/i;
 function cleanName(s){
   s=s.replace(/\(.*?\)/g,"").replace(/\b\d+(\.\d+)?\b/g,"").replace(/[|;#*]/g," ")
      .replace(/(^|\s)[-–—:]+(?=\s|$)/g," ").replace(/\s+/g," ").trim();
@@ -649,10 +726,11 @@ function parseText(txt){
       if(cur&&cur.players.length) groups.push(cur);
       let h=+tm[1], m=tm[2];
       if(tm[3]){ const ap=tm[3].toLowerCase(); if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0; }
-      cur={ start:`${h}:${m}`, players:[] };
+      cur={ start:`${h}:${m}`, startHole:null, holes:null, players:[] };
       line=line.replace(TIME_RE,"");
     }
     if(!cur) continue;
+    line=scanMeta(cur,line);
     splitPlayers(line).forEach(nm=>{ if(cur.players.length<5) cur.players.push(nm); });
   }
   if(cur&&cur.players.length) groups.push(cur);
@@ -666,12 +744,17 @@ function parsePaste(){
 }
 function renderPreview(){
   if(!pending){ $('drawPreview').innerHTML=""; return; }
+  const dh = CH()===9 ? 9 : 18;
   $('drawPreview').innerHTML=`
     <div class="card" style="border-color:var(--ink)">
       <b>Found ${pending.length} groups — check &amp; edit, then confirm</b>
-      <div style="margin-top:10px">${pending.map((g,i)=>`
+      <div style="margin-top:10px">
+        <div class="drawrow drawhead"><span>Time</span><span>Tee</span><span>Holes</span><span>Players</span><span></span></div>
+        ${pending.map((g,i)=>`
         <div class="drawrow">
           <input value="${esc(g.start)}" onchange="pending[${i}].start=this.value">
+          <input type="number" min="1" max="${CH()}" value="${g.startHole||1}" onchange="pending[${i}].startHole=+this.value">
+          <input type="number" min="1" max="36" value="${g.holes||dh}" onchange="pending[${i}].holes=+this.value">
           <input value="${esc(g.players.join(', '))}" onchange="pending[${i}].players=splitPlayers(this.value)">
           <button onclick="pending.splice(${i},1);renderPreview()" title="Remove">&times;</button>
         </div>`).join("")}
@@ -683,10 +766,17 @@ function renderPreview(){
     </div>`;
 }
 function confirmDraw(){
-  pending.forEach(p=>{ if(toMin(p.start)==null) p.start="8:00"; p.players=p.players.map(flipName); });
-  pending.sort((a,b)=>toMin(a.start)-toMin(b.start));
+  const ch=CH(), dh = ch===9 ? 9 : 18;
+  pending.forEach(p=>{
+    if(toMin(p.start)==null) p.start="8:00";
+    p.players=p.players.map(flipName);
+    p.startHole=Math.min(Math.max(+p.startHole||1,1),ch);
+    p.holes=Math.min(Math.max(+p.holes||dh,1),36);
+  });
+  pending.sort((a,b)=>(toMin(a.start)-toMin(b.start)) || (a.startHole-b.startHole));
   S.groups = pending.map((p,i)=>({ id:Date.now()+i, name:"Group "+(i+1), players:p.players,
-                                   start:hm(toMin(p.start)), fin:Array(18).fill(null), lastStatus:null }));
+                                   start:hm(toMin(p.start)), startHole:p.startHole, holes:p.holes,
+                                   fin:Array(36).fill(null), lastStatus:null }));
   S.myGroup=null; pending=null;
   logAdd("—",`draw loaded: ${S.groups.length} groups, first tee ${S.groups[0].start}`,'');
   save(); renderAll(); toast("Draw loaded"); show('field');
@@ -738,13 +828,17 @@ async function parseFile(f){
 let manual=[];
 function manualAdd(){
   const s=$('setInterval').value||S.settings.interval||9;
+  const dh = CH()===9 ? 9 : 18;
   const t = manual.length ? hm(toMin(manual[manual.length-1].start)+ +s) : "8:00";
-  manual.push({start:t,players:[]}); renderManual();
+  manual.push({start:t,startHole:1,holes:dh,players:[]}); renderManual();
 }
 function renderManual(){
-  $('manualRows').innerHTML=manual.map((g,i)=>`
+  $('manualRows').innerHTML=(manual.length?`<div class="drawrow drawhead"><span>Time</span><span>Tee</span><span>Holes</span><span>Players</span><span></span></div>`:"")+
+   manual.map((g,i)=>`
     <div class="drawrow">
       <input value="${esc(g.start)}" onchange="manual[${i}].start=this.value">
+      <input type="number" min="1" max="${CH()}" value="${g.startHole}" onchange="manual[${i}].startHole=+this.value">
+      <input type="number" min="1" max="36" value="${g.holes}" onchange="manual[${i}].holes=+this.value">
       <input placeholder="Names, comma separated" value="${esc(g.players.join(', '))}" onchange="manual[${i}].players=splitPlayers(this.value)">
       <button onclick="manual.splice(${i},1);renderManual()">&times;</button>
     </div>`).join("");
@@ -757,27 +851,30 @@ function saveEventSettings(){
   S.settings.name=$('setName').value.trim();
   S.settings.date=$('setDate').value;
   S.settings.interval=+$('setInterval').value||9;
-  save(); renderHeader(); toast("Event saved");
+  S.settings.courseHoles=+$('setCourse').value||18;
+  S.groups.forEach(g=>{ if((g.startHole||1)>CH()) g.startHole=1; g.lastStatus=null; });
+  refreshStatuses(); save(); renderHeader(); renderSettings(); renderAll(); toast("Event saved");
 }
 function renderSettings(){
   $('setName').value=S.settings.name; $('setDate').value=S.settings.date; $('setInterval').value=S.settings.interval;
+  $('setCourse').value=S.settings.courseHoles;
   $('thAmber').value=S.settings.thAmber; $('thRed').value=S.settings.thRed;
-  $('tpGrid').innerHTML=S.settings.timePar.map((v,i)=>`<label>H${i+1}<input type="number" min="8" max="25" value="${v}" data-tp="${i}" oninput="tpTotal()"></label>`).join("");
+  $('tpGrid').innerHTML=Array.from({length:CH()},(_,i)=>`<label>H${i+1}<input type="number" min="8" max="25" value="${S.settings.timePar[i]}" data-tp="${i}" oninput="tpTotal()"></label>`).join("");
   tpTotal();
 }
 function tpTotal(){
   let t=0; document.querySelectorAll('[data-tp]').forEach(inp=>t+= +inp.value||0);
-  $('tpTotal').textContent=Math.floor(t/60)+"h "+(t%60).toString().padStart(2,'0')+"m ("+t+" min)";
+  $('tpTotal').textContent=Math.floor(t/60)+"h "+(t%60).toString().padStart(2,'0')+"m ("+t+" min)"+(CH()===9?" per lap of 9":"");
 }
 function saveTimePar(){
   document.querySelectorAll('[data-tp]').forEach(inp=>S.settings.timePar[+inp.dataset.tp]=+inp.value||14);
   S.groups.forEach(g=>g.lastStatus=null); refreshStatuses(); save(); renderAll(); toast("Time par saved");
 }
 function tpSpread(){
-  const v=prompt("Total round time in minutes (e.g. 255 for 4h15):","255");
-  const t=+v; if(!t||t<120) return;
-  const per=Math.round(t/18*10)/10;
-  document.querySelectorAll('[data-tp]').forEach(inp=>inp.value=Math.round(per));
+  const def = CH()===9 ? "128" : "255";
+  const v=prompt(`Total time for ${CH()} holes, in minutes (e.g. ${def} for ${CH()===9?"2h08":"4h15"}):`,def);
+  const t=+v; if(!t||t<60) return;
+  document.querySelectorAll('[data-tp]').forEach(inp=>inp.value=Math.round(t/CH()));
   tpTotal();
 }
 function saveThresholds(){
@@ -786,7 +883,7 @@ function saveThresholds(){
 }
 function renderDrawCurrent(){
   $('drawCurrent').innerHTML = S.groups.length
-    ? S.groups.map((g,i)=>`<div style="padding:4px 0"><b class="num">${hm(toMin(g.start))}</b> — ${i+1}. ${esc(g.players.join(', '))||'(no names)'}</div>`).join("")
+    ? S.groups.map((g,i)=>`<div style="padding:4px 0"><b class="num">${hm(toMin(g.start))}</b> tee ${g.startHole||1}, ${gHoles(g)}h — ${i+1}. ${esc(g.players.join(', '))||'(no names)'}</div>`).join("")
     : "No draw loaded.";
 }
 
@@ -806,32 +903,39 @@ function addNote(){
 
 /* ================= RECORDS ================= */
 function archiveRound(){
+  if(S.role!=='official') return;
   if(!S.groups.length){ alert("No groups to archive."); return; }
   if(!confirm("Archive this round and clear the live field?")) return;
   S.records.unshift({
     name:S.settings.name||"Untitled round", date:S.settings.date,
-    timePar:S.settings.timePar.slice(), interval:S.settings.interval,
-    groups:S.groups.map(g=>({name:g.name,players:g.players,start:g.start,fin:g.fin.slice()})),
+    timePar:S.settings.timePar.slice(), interval:S.settings.interval, courseHoles:CH(),
+    groups:S.groups.map(g=>({name:g.name,players:g.players,start:g.start,startHole:g.startHole||1,holes:gHoles(g),fin:g.fin.slice()})),
     log:S.log.slice()
   });
-  S.groups.forEach(g=>{ g.fin=Array(18).fill(null); g.lastStatus=null; });
+  S.groups.forEach(g=>{ g.fin=Array(36).fill(null); g.lastStatus=null; });
   S.log=[]; save(); renderAll(); toast("Round archived"); 
+}
+function recParG(r,g){
+  const ch=r.courseHoles||18; let t=0;
+  for(let k=0;k<g.holes;k++) t+= +r.timePar[((g.startHole-1+k)%ch)]||14;
+  return t;
 }
 function renderRecords(){
   const el=$('recordsList');
   if(!S.records.length){ el.innerHTML=`<div class="card muted small">No archived rounds yet. Archive a round above and every group's hole-by-hole times land here — your timing record builds over time.</div>`; return; }
   el.innerHTML=S.records.map((r,ri)=>{
     const rows=r.groups.map(g=>{
-      const n=g.fin.filter(x=>x!=null).length;
-      const done=n===18;
-      const total=done? g.fin[17]-toMin(g.start) : null;
-      const par=r.timePar.reduce((a,b)=>a+ +b,0);
+      const gh=g.holes||18;
+      const n=g.fin.slice(0,gh).filter(x=>x!=null).length;
+      const done=n===gh;
+      const total=done? g.fin[gh-1]-toMin(g.start) : null;
+      const par=recParG(r,g);
       return `<tr><td>${esc(g.players.join(', ')||g.name)}</td>
-        <td class="num">${hm(toMin(g.start))}</td>
-        <td class="num">${done?Math.floor(total/60)+"h "+Math.round(total%60).toString().padStart(2,'0'):"thru "+n}</td>
+        <td class="num">${hm(toMin(g.start))} / T${g.startHole||1}</td>
+        <td class="num">${done?Math.floor(total/60)+"h "+Math.round(total%60).toString().padStart(2,'0')+" ("+gh+"h)":"thru "+n+"/"+gh}</td>
         <td class="num ${done?(total-par>0?'tm':'tp'):''}">${done?signed(total-par):""}</td></tr>`;
     }).join("");
-    const totals=r.groups.map(g=>g.fin[17]!=null?g.fin[17]-toMin(g.start):null).filter(x=>x!=null);
+    const totals=r.groups.map(g=>{const gh=g.holes||18; return g.fin[gh-1]!=null?g.fin[gh-1]-toMin(g.start):null}).filter(x=>x!=null);
     const best=totals.length?Math.min(...totals):null;
     return `<details><summary>${esc(r.name)} — ${esc(r.date)} <span class="muted small">(${r.groups.length} groups${best!=null?", fastest "+Math.floor(best/60)+"h "+Math.round(best%60).toString().padStart(2,'0'):""})</span></summary>
       <div class="inner">
@@ -842,13 +946,18 @@ function renderRecords(){
 }
 function exportCSV(ri){
   const r=S.records[ri];
-  let csv="Group,Players,Tee,"+Array.from({length:18},(_,i)=>"H"+(i+1)).join(",")+",Total(min),VsPar(min)\n";
+  const ch=r.courseHoles||18;
+  const maxH=Math.max(...r.groups.map(g=>g.holes||18));
+  let csv="Group,Players,Tee time,Start hole,Holes,"+Array.from({length:maxH},(_,i)=>"Seq"+(i+1)).join(",")+",Total(min),VsPar(min)\n";
   r.groups.forEach(g=>{
-    const start=toMin(g.start);
-    const times=g.fin.map((f,i)=>{ const prev=i===0?start:g.fin[i-1]; return f!=null&&prev!=null?Math.round((f-prev)*10)/10:""; });
-    const total=g.fin[17]!=null?Math.round(g.fin[17]-start):"";
-    const par=r.timePar.reduce((a,b)=>a+ +b,0);
-    csv+=`"${g.name}","${g.players.join('; ')}",${g.start},${times.join(",")},${total},${total!==""?total-par:""}\n`;
+    const gh=g.holes||18, start=toMin(g.start);
+    const times=Array.from({length:maxH},(_,k)=>{
+      if(k>=gh) return "";
+      const prev=k===0?start:g.fin[k-1];
+      return g.fin[k]!=null&&prev!=null?Math.round((g.fin[k]-prev)*10)/10:"";
+    });
+    const total=g.fin[gh-1]!=null?Math.round(g.fin[gh-1]-start):"";
+    csv+=`"${g.name}","${g.players.join('; ')}",${g.start},${g.startHole||1},${gh},${times.join(",")},${total},${total!==""?total-recParG(r,g):""}\n`;
   });
   download(csv,"text/csv",(r.name||"round").replace(/\W+/g,"-")+".csv");
 }
@@ -863,32 +972,71 @@ function exportJSON(){ download(JSON.stringify(S),"application/json","pace-"+(S.
 async function importJSON(f){
   if(!f) return;
   try{
-    const inc=JSON.parse(await f.text());
+    const inc=migrate(JSON.parse(await f.text()));
     if(!inc.groups){ alert("That doesn't look like a Pace of Play export."); return; }
-    if(!S.groups.length){ S=inc; }
+    if(!S.groups.length){
+      const keepRole=S.role, keepPin=S.settings.pin;
+      S=inc; S.role=keepRole; S.myGroup=null;
+      S.settings.pin = keepPin || inc.settings.pin;   // event PIN unlocks official mode if this phone had none
+    }
     else{
-      // merge: match groups by tee time (then name); imported times fill gaps
+      // merge: match groups by tee time + start hole (then name); imported times fill gaps
       inc.groups.forEach(ig=>{
-        const g=S.groups.find(x=>x.start===ig.start)||S.groups.find(x=>x.name===ig.name);
+        const g=S.groups.find(x=>x.start===ig.start&&(x.startHole||1)===(ig.startHole||1))||S.groups.find(x=>x.name===ig.name);
         if(g) ig.fin.forEach((f,i)=>{ if(f!=null&&g.fin[i]==null) g.fin[i]=f; });
       });
       const seen=new Set(S.log.map(l=>l.dt+l.msg));
       (inc.log||[]).forEach(l=>{ if(!seen.has(l.dt+l.msg)) S.log.push(l); });
       S.log.sort((a,b)=>b.dt<a.dt?-1:1);
     }
-    S.groups.forEach(g=>g.lastStatus=null); refreshStatuses(); save(); renderAll();
+    S.groups.forEach(g=>g.lastStatus=null); refreshStatuses(); save(); applyRole(); renderAll();
     toast("Data merged");
   }catch(e){ alert("Couldn't read that file."); }
   $('importBox').value="";
 }
 function wipe(){
-  if(!confirm("Erase the draw, times, log and all records on this phone?")) return;
+  if(S.role!=='official') return;
+  if(!confirm("Erase the draw, times, log, records and admin PIN on this phone?")) return;
   S=blank(); try{localStorage.removeItem('pace-v1')}catch(e){}
-  save(); renderAll(); toast("Erased");
+  save(); applyRole(); renderAll(); show('role'); toast("Erased");
 }
+
+/* ================= ROLES =================
+   'official' sees everything; 'player' sees only Field (read-only) and
+   Player, and cannot reach setup, the log, records or erase. Official
+   mode is behind a PIN so a handed-over or player phone stays locked. */
+function pinHash(s){ let h=5381; for(const c of s) h=((h*33)^c.charCodeAt(0))>>>0; return "h"+h; }
+function chooseOfficial(){
+  if(!S.settings.pin){
+    const p=prompt("Create an admin PIN (at least 4 characters). Anyone switching this app to official mode will need it:");
+    if(p===null) return;
+    if(p.trim().length<4){ alert("PIN needs at least 4 characters."); return; }
+    S.settings.pin=pinHash(p.trim());
+  }else{
+    const p=prompt("Enter the admin PIN:");
+    if(p===null) return;
+    if(pinHash(p.trim())!==S.settings.pin){ alert("Wrong PIN."); return; }
+  }
+  S.role='official'; save(); applyRole(); renderAll(); show(S.groups.length?'field':'draw');
+}
+function choosePlayer(){
+  S.role='player'; save(); applyRole(); renderAll(); show('player');
+}
+function lockToPlayer(){
+  if(!S.settings.pin){ alert("Set up official mode first so a PIN exists — otherwise anyone can switch back."); return; }
+  choosePlayer(); toast("Locked to player mode");
+}
+function applyRole(){
+  const off=S.role==='official';
+  document.querySelector('nav').style.display = S.role? 'flex':'none';
+  ['nb-draw','nb-log','nb-more'].forEach(id=>$(id).style.display= off? '':'none');
+}
+const OFFICIAL_ONLY=['draw','log','more','group'];
 
 /* ================= NAV / INIT ================= */
 function show(s){
+  if(S.role==null && s!=='role') s='role';
+  if(S.role==='player' && OFFICIAL_ONLY.includes(s)) s='player';
   document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));
   $('scr-'+s).classList.add('on');
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));
@@ -903,7 +1051,8 @@ function renderAll(){
   renderHeader(); renderField(); renderPlayer(); renderDrawCurrent(); renderLog(); renderRecords();
   if($('scr-group').classList.contains('on')) renderGroup();
 }
-renderSettings(); renderAll(); show(S.groups.length?'field':'draw');
+renderSettings(); renderAll(); applyRole();
+show(S.role==null ? 'role' : S.role==='official' ? (S.groups.length?'field':'draw') : 'player');
 /* Keep 'due by' clocks and pending statuses fresh */
 setInterval(()=>{ if(document.visibilityState==='visible') renderField(); }, 30000);
 /* Offline support once hosted (e.g. GitHub Pages) */
