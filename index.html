@@ -506,6 +506,21 @@ function editFinish(gi,k){
   else{ const m=toMin(v); if(m==null){ alert("Use HH:MM, e.g. 10:42"); return; } g.fin[k]=m; }
   g.lastStatus=null; refreshStatuses(); save(); renderAll();
 }
+/* Player missed some taps: record "now" against the hole they name */
+function recordAtHole(gi){
+  const g=S.groups[gi], gh=gHoles(g);
+  const v=prompt("Which hole did you just finish? (the hole number on the course)");
+  if(v===null) return;
+  const hn=+v;
+  if(!hn){ alert("Enter the hole number, e.g. 7"); return; }
+  let k=-1;
+  for(let j=0;j<gh;j++) if(holeSeq(g,j)===hn && g.fin[j]==null){ k=j; break; }
+  if(k<0){ alert(`Couldn't match hole ${hn} — it's already recorded or isn't in your ${gh} holes.`); return; }
+  g.fin[k]=nowMin(); g.lastStatus=null; refreshStatuses(); save(); renderAll();
+  toast(`Hole ${hn} recorded at ${hm(g.fin[k])}`);
+}
+/* Where the time par schedule says a group should be right now is computed
+   inline in renderPlayer (schedHole) and refreshed on a timer. */
 
 /* ================= RENDER: FIELD ================= */
 function renderStrip(){
@@ -614,9 +629,26 @@ function renderPlayer(){
   if(S.myGroup==null||!S.groups[S.myGroup]){ p.innerHTML=`<div class="card muted small">Pick your group above. Then tap the button each time your group holes out — the app tells you where you stand.</div>`; return; }
   const gi=S.myGroup, g=S.groups[gi], st=statusOf(gi), n=st.n, gh=gHoles(g);
   const start=toMin(g.start);
+  const now=nowMin();
+  const dueOf=k=>start+cumParG(g,k+1);        // time-par finish time for the k-th hole played
+  /* Which hole SHOULD they be on right now, judged purely by the clock?
+     The first unrecorded-or-later hole whose due time hasn't passed yet. */
+  function schedHole(){
+    let k=Math.max(n,0);
+    while(k<gh-1 && dueOf(k)<now) k++;
+    return {k, due:dueOf(k), pastEnd: dueOf(gh-1)<now};
+  }
   let detail="", target="";
   if(st.code==='pending'){
-    detail=`Tee time ${hm(start)} on hole ${g.startHole||1} (${gh} holes). Tap below as you hole out on ${holeSeq(g,0)}.`;
+    if(start!=null && now>start+1){
+      const s=schedHole();
+      detail = s.pastEnd
+        ? `No times recorded — by time par your round should already be finished.`
+        : `No times recorded yet. By time par you should be finishing hole <b class="num">${holeSeq(g,s.k)}</b> by <b class="num">${hm(s.due)}</b>.`;
+      target=`Tap "We holed out" each time you finish a hole to see how your round is really tracking.`;
+    }else{
+      detail=`Tee time ${hm(start)} on hole ${g.startHole||1} (${gh} holes). Tap below as you hole out on ${holeSeq(g,0)}.`;
+    }
   }else if(st.code==='done'){
     const total=g.fin[gh-1]-start;
     detail=`${gh} holes in ${Math.floor(total/60)}h ${Math.round(total%60)}m — ${signed(st.vsPar)} min v time par.`;
@@ -630,7 +662,17 @@ function renderPlayer(){
         ? `<br>Gap to the group ahead is <b class="num">${Math.round(st.gapEx)} min more</b> than your starting interval.`
         : `<br>You're holding your starting interval to the group ahead.`;
     }
-    if(n<gh){ target=`Hole out on ${holeSeq(g,n)} by <b class="num">${hm(start+cumParG(g,n+1))}</b> to be on time par.`; }
+    if(n<gh){
+      const due=dueOf(n);
+      if(now>due+1){
+        const s=schedHole();
+        target = s.pastEnd
+          ? `By time par your round should already be finished — tap through your remaining holes as you complete them.`
+          : `Nothing recorded since hole ${holeSeq(g,n-1)}. By time par you should be finishing hole <b class="num">${holeSeq(g,s.k)}</b> by <b class="num">${hm(s.due)}</b> — tap "We holed out" each hole to see exactly where you stand.`;
+      }else{
+        target=`Hole out on ${holeSeq(g,n)} by <b class="num">${hm(due)}</b> to be on time par.`;
+      }
+    }
   }
   let hist="";
   if(n>0){
@@ -648,6 +690,7 @@ function renderPlayer(){
       ${target?`<div class="target">${target}</div>`:""}
     </div>
     ${n<gh?`<button class="big" onclick="recordFinish(${gi})">We holed out on ${holeSeq(g,n)}</button>`:""}
+    ${n<gh?`<p class="small" style="text-align:center;margin-top:8px"><a href="#" onclick="recordAtHole(${gi});return false" style="color:var(--ink-soft)">Just finished a different hole? Record it here</a></p>`:""}
     ${n>0&&n<gh?`<button class="subtle" style="width:100%;margin-top:8px" onclick="undoFinish(${gi})">Undo hole ${holeSeq(g,n-1)}</button>`:""}
     ${hist}`;
 }
@@ -1053,8 +1096,8 @@ function renderAll(){
 }
 renderSettings(); renderAll(); applyRole();
 show(S.role==null ? 'role' : S.role==='official' ? (S.groups.length?'field':'draw') : 'player');
-/* Keep 'due by' clocks and pending statuses fresh */
-setInterval(()=>{ if(document.visibilityState==='visible') renderField(); }, 30000);
+/* Keep 'due by' clocks, pending statuses and player schedule nudges fresh */
+setInterval(()=>{ if(document.visibilityState==='visible'){ renderField(); renderPlayer(); } }, 30000);
 /* Offline support once hosted (e.g. GitHub Pages) */
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
