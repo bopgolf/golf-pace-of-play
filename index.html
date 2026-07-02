@@ -225,11 +225,7 @@ details .inner{padding:0 14px 14px}
 <!-- ============ PLAYER ============ -->
 <section class="screen" id="scr-player">
   <h2>My group</h2>
-  <div class="card">
-    <label class="f"><span>I'm playing in</span>
-      <select id="myGroup" onchange="setMyGroup(this.value)"></select>
-    </label>
-  </div>
+  <div class="card" id="myGroupCard"></div>
   <div id="playerEvent"></div>
   <div id="playerPanel"></div>
   <p class="muted small" style="text-align:center;margin-top:18px"><a href="#" onclick="chooseOfficial();return false" style="color:var(--ink-soft)">Official sign-in</a></p>
@@ -245,6 +241,9 @@ details .inner{padding:0 14px 14px}
       <label class="f"><span>Tee interval (min)</span><input id="setInterval" type="number" min="6" max="15" step="1"></label>
       <label class="f"><span>Course</span><select id="setCourse"><option value="18">18 holes</option><option value="9">9 holes</option></select></label>
     </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:.9rem">
+      <input type="checkbox" id="setTeams" style="width:auto"> Teams event — players may switch their group themselves
+    </label>
     <button class="ghost" onclick="saveEventSettings()">Save event details</button>
   </div>
 
@@ -275,6 +274,9 @@ details .inner{padding:0 14px 14px}
   </div>
 
   <div id="drawPreview"></div>
+
+  <h2>Upcoming rounds</h2>
+  <div id="upcomingList" class="card muted small">No rounds queued. When a draw file contains several rounds ("Round 1", "Round 2"...) the later ones queue here automatically — or queue any parsed draw from the preview.</div>
 
   <h2>Current draw</h2>
   <div id="drawCurrent" class="card muted small">No draw loaded.</div>
@@ -373,6 +375,8 @@ function blank(){
 }
 function migrate(s){
   s.role=s.role??null;
+  s.upcoming=s.upcoming||[];
+  s.settings.teamsEvent=s.settings.teamsEvent||false;
   s.settings.courseHoles=s.settings.courseHoles||18;
   s.settings.pin=s.settings.pin||null;
   (s.groups||[]).forEach(g=>{ g.startHole=g.startHole||1; g.holes=g.holes||18; });
@@ -602,7 +606,7 @@ function renderGroup(){
         ${st.gapEx!=null?` · <b class="num ${st.gapEx>0?'tm':'tp'}">${signed(st.gapEx)} min</b> beyond interval to group ahead`:""}
       </div>`:""}
       ${n<gh?`<button class="big" onclick="recordFinish(${openGi})">Holed out on ${holeSeq(g,n)} — record now</button>`:`<div class="pill" style="background:var(--ink);color:#fff">Round complete</div>`}
-      ${n>0&&n<gh?`<button class="subtle" style="width:100%;margin-top:8px" onclick="undoFinish(${openGi})">Undo hole ${holeSeq(g,n-1)}</button>`:""}
+      ${n>0?`<button class="subtle" style="width:100%;margin-top:8px" onclick="undoFinish(${openGi})">Undo hole ${holeSeq(g,n-1)}</button>`:""}
     </div>
     <div class="card">
       <table class="holes">
@@ -613,11 +617,28 @@ function renderGroup(){
 }
 
 /* ================= RENDER: PLAYER ================= */
-function setMyGroup(v){ S.myGroup = v===""?null:+v; save(); renderPlayer(); }
+function setMyGroup(v){
+  if(v===""){ S.myGroup=null; save(); renderPlayer(); return; }
+  const idx=+v, g=S.groups[idx];
+  if(S.role==='player' && !S.settings.teamsEvent && S.myGroup==null){
+    if(!confirm(`Lock this phone to: ${g.players.join(', ')||g.name}?\n\nIndividual event — you won't be able to switch groups yourself afterwards (an official can).`)){ renderPlayer(); return; }
+  }
+  S.myGroup=idx; save(); renderPlayer();
+}
+function groupLabel(g,i){ return `${i+1}. ${esc(g.players.join(', '))||esc(g.name)} — ${hm(toMin(g.start))}, tee ${g.startHole||1}`; }
 function renderPlayer(){
-  const sel=$('myGroup');
-  sel.innerHTML=`<option value="">— choose your group —</option>`+
-    S.groups.map((g,i)=>`<option value="${i}" ${S.myGroup===i?'selected':''}>${i+1}. ${esc(g.name)} — ${hm(toMin(g.start))}, tee ${g.startHole||1}</option>`).join("");
+  /* Individual events lock a player phone to its chosen group; officials and
+     teams events keep the selector. */
+  const locked = S.role==='player' && !S.settings.teamsEvent && S.myGroup!=null && S.groups[S.myGroup];
+  $('myGroupCard').innerHTML = locked
+    ? `<div><span class="pill" style="background:var(--ink);color:#fff">Locked</span>
+       <div style="margin-top:8px;font-weight:700">${groupLabel(S.groups[S.myGroup],S.myGroup)}</div>
+       <p class="muted small" style="margin-top:6px">Individual event — this phone stays with this group. Wrong group? Use Official sign-in below.</p></div>`
+    : `<label class="f"><span>I'm playing in</span>
+       <select id="myGroup" onchange="setMyGroup(this.value)">
+         <option value="">— choose your group —</option>
+         ${S.groups.map((g,i)=>`<option value="${i}" ${S.myGroup===i?'selected':''}>${groupLabel(g,i)}</option>`).join("")}
+       </select></label>`;
   // Player phones need the event without touching setup: load the official's export here
   $('playerEvent').innerHTML = S.role==='player' ? `
     <div class="card small">
@@ -691,7 +712,7 @@ function renderPlayer(){
     </div>
     ${n<gh?`<button class="big" onclick="recordFinish(${gi})">We holed out on ${holeSeq(g,n)}</button>`:""}
     ${n<gh?`<p class="small" style="text-align:center;margin-top:8px"><a href="#" onclick="recordAtHole(${gi});return false" style="color:var(--ink-soft)">Just finished a different hole? Record it here</a></p>`:""}
-    ${n>0&&n<gh?`<button class="subtle" style="width:100%;margin-top:8px" onclick="undoFinish(${gi})">Undo hole ${holeSeq(g,n-1)}</button>`:""}
+    ${n>0?`<button class="subtle" style="width:100%;margin-top:8px" onclick="undoFinish(${gi})">Undo hole ${holeSeq(g,n-1)} (tapped by mistake?)</button>`:""}
     ${hist}`;
 }
 
@@ -779,50 +800,126 @@ function parseText(txt){
   if(cur&&cur.players.length) groups.push(cur);
   return groups;
 }
-let pending=null;
+/* Draws can contain several rounds. Lines like "Round 2", "Round 2 Draw -
+   Sunday" split the text into rounds; a draw with no such headers is one round. */
+function parseRounds(txt){
+  const ROUND_RE=/\bround\s*#?\s*(\d+)\b/i;
+  const lines=txt.split(/\r?\n/);
+  const segs=[]; let label=null, buf=[];
+  for(const line of lines){
+    const m=line.match(ROUND_RE);
+    if(m && !TIME_RE.test(line)){            // a round header, not a tee-time line
+      if(buf.length) segs.push({label,text:buf.join("\n")});
+      label="Round "+m[1]; buf=[];
+    } else buf.push(line);
+  }
+  segs.push({label,text:buf.join("\n")});
+  const rounds=segs.map(s=>({label:s.label,groups:parseText(s.text)})).filter(r=>r.groups.length);
+  rounds.forEach((r,i)=>{ if(!r.label) r.label="Round "+(i+1); });
+  return rounds;
+}
+let pending=null; // [{label, groups:[{start,startHole,holes,players}]}]
 function parsePaste(){
-  const g=parseText($('pasteBox').value);
-  if(!g.length){ alert("Couldn't find tee times in that text. Each group needs a time like 8:00 or 8:00 am — or use the Manual tab."); return; }
-  pending=g; renderPreview();
+  const r=parseRounds($('pasteBox').value);
+  if(!r.length){ alert("Couldn't find tee times in that text. Each group needs a time like 8:00 or 8:00 am — or use the Manual tab."); return; }
+  pending=r; renderPreview();
 }
 function renderPreview(){
   if(!pending){ $('drawPreview').innerHTML=""; return; }
   const dh = CH()===9 ? 9 : 18;
+  const multi = pending.length>1;
+  const roundsHtml = pending.map((r,ri)=>`
+    <div style="margin-top:${ri?14:10}px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <b>${esc(r.label)} — ${r.groups.length} groups</b>
+        ${multi?`<button class="subtle" style="padding:6px 10px;font-size:.75rem" onclick="pending.splice(${ri},1);if(!pending.length)pending=null;renderPreview()">Remove round</button>`:""}
+      </div>
+      <div class="drawrow drawhead"><span>Time</span><span>Tee</span><span>Holes</span><span>Players</span><span></span></div>
+      ${r.groups.map((g,gi)=>`
+      <div class="drawrow">
+        <input value="${esc(g.start)}" onchange="pending[${ri}].groups[${gi}].start=this.value">
+        <input type="number" min="1" max="${CH()}" value="${g.startHole||1}" onchange="pending[${ri}].groups[${gi}].startHole=+this.value">
+        <input type="number" min="1" max="36" value="${g.holes||dh}" onchange="pending[${ri}].groups[${gi}].holes=+this.value">
+        <input value="${esc(g.players.join(', '))}" onchange="pending[${ri}].groups[${gi}].players=splitPlayers(this.value)">
+        <button onclick="pending[${ri}].groups.splice(${gi},1);renderPreview()" title="Remove">&times;</button>
+      </div>`).join("")}
+    </div>`).join("");
   $('drawPreview').innerHTML=`
     <div class="card" style="border-color:var(--ink)">
-      <b>Found ${pending.length} groups — check &amp; edit, then confirm</b>
-      <div style="margin-top:10px">
-        <div class="drawrow drawhead"><span>Time</span><span>Tee</span><span>Holes</span><span>Players</span><span></span></div>
-        ${pending.map((g,i)=>`
-        <div class="drawrow">
-          <input value="${esc(g.start)}" onchange="pending[${i}].start=this.value">
-          <input type="number" min="1" max="${CH()}" value="${g.startHole||1}" onchange="pending[${i}].startHole=+this.value">
-          <input type="number" min="1" max="36" value="${g.holes||dh}" onchange="pending[${i}].holes=+this.value">
-          <input value="${esc(g.players.join(', '))}" onchange="pending[${i}].players=splitPlayers(this.value)">
-          <button onclick="pending.splice(${i},1);renderPreview()" title="Remove">&times;</button>
-        </div>`).join("")}
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button class="big" onclick="confirmDraw()">Use this draw</button>
+      <b>Found ${multi? pending.length+" rounds":"1 round"} — check &amp; edit, then choose</b>
+      ${roundsHtml}
+      <div class="row" style="margin-top:12px">
+        ${multi
+          ? `<button class="big" onclick="useAllRounds()">Load: ${esc(pending[0].label)} live, rest queued</button>
+             <button class="ghost" onclick="queueAllRounds()">Queue all for later</button>`
+          : `<button class="big" onclick="useLiveRound(0)">Use as live round</button>
+             <button class="ghost" onclick="queueRound(0)">Queue for later</button>`}
         <button class="subtle" onclick="pending=null;renderPreview()">Discard</button>
       </div>
     </div>`;
 }
-function confirmDraw(){
-  const ch=CH(), dh = ch===9 ? 9 : 18;
-  pending.forEach(p=>{
-    if(toMin(p.start)==null) p.start="8:00";
-    p.players=p.players.map(flipName);
-    p.startHole=Math.min(Math.max(+p.startHole||1,1),ch);
-    p.holes=Math.min(Math.max(+p.holes||dh,1),36);
-  });
-  pending.sort((a,b)=>(toMin(a.start)-toMin(b.start)) || (a.startHole-b.startHole));
-  S.groups = pending.map((p,i)=>({ id:Date.now()+i, name:"Group "+(i+1), players:p.players,
-                                   start:hm(toMin(p.start)), startHole:p.startHole, holes:p.holes,
-                                   fin:Array(36).fill(null), lastStatus:null }));
-  S.myGroup=null; pending=null;
-  logAdd("—",`draw loaded: ${S.groups.length} groups, first tee ${S.groups[0].start}`,'');
-  save(); renderAll(); toast("Draw loaded"); show('field');
+function normGroups(pg){
+  const ch=CH(), dh=ch===9?9:18;
+  const gs=pg.map(p=>({ start:hm(toMin(p.start)==null?480:toMin(p.start)),
+                        startHole:Math.min(Math.max(+p.startHole||1,1),ch),
+                        holes:Math.min(Math.max(+p.holes||dh,1),36),
+                        players:(p.players||[]).map(flipName) }));
+  gs.sort((a,b)=>(toMin(a.start)-toMin(b.start))||(a.startHole-b.startHole));
+  return gs;
+}
+function hasTimes(){ return S.groups.some(g=>g.fin&&g.fin.some(x=>x!=null)); }
+function goLive(label,pg){
+  if(hasTimes()){
+    if(!confirm("The current round has recorded times. OK = archive it to Records and load the new round. Cancel = keep the current round.")) return false;
+    S.records.unshift(snapshotRound());
+    S.log=[];
+  }
+  S.groups=normGroups(pg).map((p,i)=>({ id:Date.now()+i, name:"Group "+(i+1), players:p.players,
+      start:p.start, startHole:p.startHole, holes:p.holes, fin:Array(36).fill(null), lastStatus:null }));
+  S.myGroup=null;
+  logAdd("—",`${label||"draw"} loaded: ${S.groups.length} groups, first tee ${S.groups[0].start}`,'');
+  return true;
+}
+function useLiveRound(ri){
+  if(!goLive(pending[ri].label,pending[ri].groups)) return;
+  pending=null; save(); renderAll(); toast("Round loaded"); show('field');
+}
+function queueRound(ri){
+  S.upcoming.push({label:pending[ri].label,groups:normGroups(pending[ri].groups)});
+  pending.splice(ri,1); if(!pending.length) pending=null;
+  save(); renderAll(); toast("Round queued");
+}
+function useAllRounds(){
+  if(!goLive(pending[0].label,pending[0].groups)) return;
+  for(let i=1;i<pending.length;i++) S.upcoming.push({label:pending[i].label,groups:normGroups(pending[i].groups)});
+  pending=null; save(); renderAll(); toast("Loaded — later rounds queued"); show('field');
+}
+function queueAllRounds(){
+  pending.forEach(r=>S.upcoming.push({label:r.label,groups:normGroups(r.groups)}));
+  pending=null; save(); renderAll(); toast("All rounds queued");
+}
+function makeLive(i){
+  if(S.role!=='official') return;
+  const r=S.upcoming[i];
+  if(!goLive(r.label,r.groups)) return;
+  S.upcoming.splice(i,1);
+  save(); renderAll(); toast(r.label+" is now live"); show('field');
+}
+function removeUpcoming(i){
+  if(!confirm("Remove "+S.upcoming[i].label+" from the queue?")) return;
+  S.upcoming.splice(i,1); save(); renderAll();
+}
+function renderUpcoming(){
+  const el=$('upcomingList'); if(!el) return;
+  el.innerHTML = S.upcoming.length
+    ? S.upcoming.map((r,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)">
+        <span><b>${esc(r.label)}</b> — ${r.groups.length} groups, first tee ${hm(toMin(r.groups[0].start))}</span>
+        <span class="row" style="flex:0 0 auto;gap:6px">
+          <button class="ghost" style="padding:7px 10px;font-size:.78rem" onclick="makeLive(${i})">Make live</button>
+          <button class="subtle" style="padding:7px 10px;font-size:.78rem" onclick="removeUpcoming(${i})">&times;</button>
+        </span>
+      </div>`).join("")
+    : `No rounds queued. When a draw file contains several rounds ("Round 1", "Round 2"...) the later ones queue here automatically — or queue any parsed draw from the preview.`;
 }
 
 /* File import — CSV/TXT native; XLSX/DOCX/PDF via readers fetched once from a CDN */
@@ -856,10 +953,10 @@ async function parseFile(f){
         lines.push(line.join("  ")); text+=lines.join("\n")+"\n";
       }
     }else{ msg.textContent="Unsupported file type — paste the draw text instead."; return; }
-    const g=parseText(text);
-    if(!g.length){ msg.textContent="Read the file but couldn't find tee times. Try pasting the draw text instead."; return; }
+    const r=parseRounds(text);
+    if(!r.length){ msg.textContent="Read the file but couldn't find tee times. Try pasting the draw text instead."; return; }
     msg.textContent="";
-    pending=g; renderPreview();
+    pending=r; renderPreview();
   }catch(e){
     msg.textContent = e.message==="offline"
       ? "That file type needs internet the first time (to fetch a reader). You're offline — paste the draw text instead, it always works."
@@ -887,7 +984,11 @@ function renderManual(){
     </div>`).join("");
   $('manualUseBtn').style.display=manual.length?'block':'none';
 }
-function manualUse(){ pending=manual.filter(m=>m.players.length||toMin(m.start)!=null); manual=[]; renderManual(); renderPreview(); }
+function manualUse(){
+  const gs=manual.filter(m=>m.players.length||toMin(m.start)!=null);
+  if(!gs.length) return;
+  pending=[{label:"Round "+(S.upcoming.length+1),groups:gs}]; manual=[]; renderManual(); renderPreview();
+}
 
 /* ================= SETTINGS ================= */
 function saveEventSettings(){
@@ -895,12 +996,14 @@ function saveEventSettings(){
   S.settings.date=$('setDate').value;
   S.settings.interval=+$('setInterval').value||9;
   S.settings.courseHoles=+$('setCourse').value||18;
+  S.settings.teamsEvent=$('setTeams').checked;
   S.groups.forEach(g=>{ if((g.startHole||1)>CH()) g.startHole=1; g.lastStatus=null; });
   refreshStatuses(); save(); renderHeader(); renderSettings(); renderAll(); toast("Event saved");
 }
 function renderSettings(){
   $('setName').value=S.settings.name; $('setDate').value=S.settings.date; $('setInterval').value=S.settings.interval;
   $('setCourse').value=S.settings.courseHoles;
+  $('setTeams').checked=!!S.settings.teamsEvent;
   $('thAmber').value=S.settings.thAmber; $('thRed').value=S.settings.thRed;
   $('tpGrid').innerHTML=Array.from({length:CH()},(_,i)=>`<label>H${i+1}<input type="number" min="8" max="25" value="${S.settings.timePar[i]}" data-tp="${i}" oninput="tpTotal()"></label>`).join("");
   tpTotal();
@@ -945,16 +1048,20 @@ function addNote(){
 }
 
 /* ================= RECORDS ================= */
-function archiveRound(){
-  if(S.role!=='official') return;
-  if(!S.groups.length){ alert("No groups to archive."); return; }
-  if(!confirm("Archive this round and clear the live field?")) return;
-  S.records.unshift({
+function snapshotRound(){
+  return {
     name:S.settings.name||"Untitled round", date:S.settings.date,
     timePar:S.settings.timePar.slice(), interval:S.settings.interval, courseHoles:CH(),
     groups:S.groups.map(g=>({name:g.name,players:g.players,start:g.start,startHole:g.startHole||1,holes:gHoles(g),fin:g.fin.slice()})),
     log:S.log.slice()
-  });
+  };
+}
+function archiveRound(){
+  if(S.role!=='official') return;
+  if(!S.groups.length){ alert("No groups to archive."); return; }
+  const next=S.upcoming.length? ` "${S.upcoming[0].label}" is queued — load it from the Draw tab afterwards.`:"";
+  if(!confirm("Archive this round and clear the live field?"+next)) return;
+  S.records.unshift(snapshotRound());
   S.groups.forEach(g=>{ g.fin=Array(36).fill(null); g.lastStatus=null; });
   S.log=[]; save(); renderAll(); toast("Round archived"); 
 }
@@ -1091,7 +1198,7 @@ function renderHeader(){
   $('hdrEvent').textContent = S.settings.name ? S.settings.name+" · "+S.settings.date : "No event set up";
 }
 function renderAll(){
-  renderHeader(); renderField(); renderPlayer(); renderDrawCurrent(); renderLog(); renderRecords();
+  renderHeader(); renderField(); renderPlayer(); renderDrawCurrent(); renderUpcoming(); renderLog(); renderRecords();
   if($('scr-group').classList.contains('on')) renderGroup();
 }
 renderSettings(); renderAll(); applyRole();
