@@ -606,6 +606,37 @@ function cleanName(s){
   if(!/[a-zA-ZÀ-ž]/.test(s)) return null;
   return s;
 }
+/* Names are always shown First Last. Flips "KENDALL Sam" -> "Sam Kendall";
+   "Kendall, Sam" is handled by the pairing logic below. */
+function flipName(s){
+  const m=s.match(/^([A-ZÀ-Ž'’-]{2,})\s+([A-Za-zÀ-ž][\w'’.-]*(?:\s+[A-Za-zÀ-ž][\w'’.-]*)*)$/);
+  if(m && m[1]===m[1].toUpperCase() && /[a-zà-ž]/.test(m[2])){
+    const sur=m[1].split("-").map(p=>p.charAt(0)+p.slice(1).toLowerCase()).join("-");
+    return m[2].trim()+" "+sur;
+  }
+  return s;
+}
+/* A comma list where every entry is a single word is read as surname,firstname
+   pairs: "Kendall, Sam, Smith, John" -> "Sam Kendall", "John Smith".
+   Anything with multi-word entries is treated as a plain list of names. */
+function pairOrList(parts){
+  const cleaned=parts.map(cleanName).filter(Boolean);
+  if(cleaned.length>=2 && cleaned.length%2===0 && cleaned.every(p=>!/\s/.test(p))){
+    const out=[]; for(let i=0;i<cleaned.length;i+=2) out.push(cleaned[i+1]+" "+cleaned[i]);
+    return out;
+  }
+  return cleaned.map(flipName);
+}
+/* Split a run of text into player names: strong separators (tabs, big gaps,
+   slashes, "and") divide players; commas inside a chunk go through pairOrList. */
+function splitPlayers(text){
+  const out=[];
+  String(text).split(/\t|\s{2,}|·|\/|&| and | v /i).forEach(chunk=>{
+    chunk=chunk.trim(); if(!chunk) return;
+    pairOrList(chunk.split(",")).forEach(n=>out.push(n));
+  });
+  return out;
+}
 /* Heuristic parser: any line containing a time starts a group; comma/tab-separated
    tokens on that line and name-looking lines beneath it become the players. */
 function parseText(txt){
@@ -622,9 +653,7 @@ function parseText(txt){
       line=line.replace(TIME_RE,"");
     }
     if(!cur) continue;
-    line.split(/,|\t|\s{2,}|·|\/|&| and | v /i).forEach(tok=>{
-      const nm=cleanName(tok); if(nm && cur.players.length<5) cur.players.push(nm);
-    });
+    splitPlayers(line).forEach(nm=>{ if(cur.players.length<5) cur.players.push(nm); });
   }
   if(cur&&cur.players.length) groups.push(cur);
   return groups;
@@ -643,7 +672,7 @@ function renderPreview(){
       <div style="margin-top:10px">${pending.map((g,i)=>`
         <div class="drawrow">
           <input value="${esc(g.start)}" onchange="pending[${i}].start=this.value">
-          <input value="${esc(g.players.join(', '))}" onchange="pending[${i}].players=this.value.split(',').map(s=>s.trim()).filter(Boolean)">
+          <input value="${esc(g.players.join(', '))}" onchange="pending[${i}].players=splitPlayers(this.value)">
           <button onclick="pending.splice(${i},1);renderPreview()" title="Remove">&times;</button>
         </div>`).join("")}
       </div>
@@ -654,7 +683,7 @@ function renderPreview(){
     </div>`;
 }
 function confirmDraw(){
-  pending.forEach(p=>{ if(toMin(p.start)==null) p.start="8:00"; });
+  pending.forEach(p=>{ if(toMin(p.start)==null) p.start="8:00"; p.players=p.players.map(flipName); });
   pending.sort((a,b)=>toMin(a.start)-toMin(b.start));
   S.groups = pending.map((p,i)=>({ id:Date.now()+i, name:"Group "+(i+1), players:p.players,
                                    start:hm(toMin(p.start)), fin:Array(18).fill(null), lastStatus:null }));
@@ -716,7 +745,7 @@ function renderManual(){
   $('manualRows').innerHTML=manual.map((g,i)=>`
     <div class="drawrow">
       <input value="${esc(g.start)}" onchange="manual[${i}].start=this.value">
-      <input placeholder="Names, comma separated" value="${esc(g.players.join(', '))}" onchange="manual[${i}].players=this.value.split(',').map(s=>s.trim()).filter(Boolean)">
+      <input placeholder="Names, comma separated" value="${esc(g.players.join(', '))}" onchange="manual[${i}].players=splitPlayers(this.value)">
       <button onclick="manual.splice(${i},1);renderManual()">&times;</button>
     </div>`).join("");
   $('manualUseBtn').style.display=manual.length?'block':'none';
