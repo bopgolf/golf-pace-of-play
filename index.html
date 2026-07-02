@@ -1,1435 +1,1709 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<meta name="theme-color" content="#12271C">
-<title>Pace of Play</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Golf Pace of Play</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{
-  --ink:#12271C;          /* deep fairway ink */
-  --ink-soft:#3E5A4C;
-  --paper:#F6F5EE;        /* scorecard stock */
-  --card:#FFFFFF;
-  --line:#D8D6C9;
-  --green:#1D7A46;        /* in position */
-  --amber:#B97A10;        /* drifting */
-  --red:#B3362A;          /* out of position */
-  --green-bg:#E2F1E7;
-  --amber-bg:#F7ECD6;
-  --red-bg:#F6DEDB;
-  --accent:#B3362A;       /* flag red, used sparingly */
-  --radius:10px;
-  --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --bg:#fff;--bg2:#f5f5f4;--bg3:#ebebea;
+  --text:#1a1a1a;--text2:#6b7280;--text3:#9ca3af;
+  --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.18);
+  --blue-bg:#e8f0fe;--blue:#1a56db;--blue-border:rgba(26,86,219,0.25);
+  --green-bg:#dcfce7;--green:#15803d;--green-border:rgba(21,128,61,0.3);
+  --red-bg:#fee2e2;--red:#b91c1c;--red-border:rgba(185,28,28,0.3);
+  --current:#00c853;--current-text:#003d1a;
+  --r:8px;--rl:12px;
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html{font-size:16px}
-body{
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  background:var(--paper);color:var(--ink);
-  padding-bottom:76px; /* room for nav */
-  min-height:100vh;
-}
-header.app{
-  background:var(--ink);color:var(--paper);
-  padding:14px 16px 12px;
-  display:flex;align-items:baseline;justify-content:space-between;gap:8px;
-}
-header.app h1{
-  font-size:1.05rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
-}
-header.app .event{
-  font-size:.8rem;color:#BFCFC5;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%;
-}
-main{max-width:760px;margin:0 auto;padding:14px 12px 24px}
-h2{
-  font-size:.78rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--ink-soft);margin:18px 2px 8px;
-}
-h2:first-child{margin-top:2px}
-.card{
-  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-  padding:14px;margin-bottom:10px;
-}
-.muted{color:var(--ink-soft);font-size:.85rem}
-.small{font-size:.8rem}
-button{
-  font:inherit;border:none;border-radius:var(--radius);cursor:pointer;
-  background:var(--ink);color:#fff;font-weight:700;padding:12px 16px;
-}
-button.big{width:100%;padding:16px;font-size:1.05rem}
-button.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--ink);font-weight:600}
-button.subtle{background:#ECEAE0;color:var(--ink);font-weight:600}
-button.danger{background:var(--red)}
-button:disabled{opacity:.4;cursor:default}
-input,select,textarea{
-  font:inherit;border:1.5px solid var(--line);border-radius:8px;padding:10px;
-  background:#fff;color:var(--ink);width:100%;
-}
-input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
-label.f{display:block;margin-bottom:10px}
-label.f span{display:block;font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px}
-.row{display:flex;gap:8px}
-.row>*{flex:1}
-.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#1c1c1a;--bg2:#282825;--bg3:#323230;
+  --text:#f0ede8;--text2:#a09d96;--text3:#6b6860;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.16);
+  --blue-bg:#1e3a6e;--blue:#93b4f4;--blue-border:rgba(147,180,244,0.3);
+  --green-bg:#14532d;--green:#86efac;--green-border:rgba(134,239,172,0.3);
+  --red-bg:#450a0a;--red:#fca5a5;--red-border:rgba(252,165,165,0.3);
+}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh;font-size:14px}
+.shell{max-width:740px;margin:0 auto;padding:.75rem}
 
-/* status */
-.pill{
-  display:inline-block;padding:3px 10px;border-radius:999px;
-  font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
-}
-.st-green .pill{background:var(--green-bg);color:var(--green)}
-.st-amber .pill{background:var(--amber-bg);color:var(--amber)}
-.st-red .pill{background:var(--red-bg);color:var(--red)}
-.st-pending .pill{background:#ECEAE0;color:var(--ink-soft)}
-.st-done .pill{background:var(--ink);color:#fff}
+/* HEADER */
+.hdr{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--rl);padding:.875rem 1rem;margin-bottom:.75rem;display:flex;align-items:center;gap:12px}
+.hdr-logo{font-size:22px}
+.hdr-title{font-size:16px;font-weight:600;line-height:1.2}
+.hdr-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.hdr-right{margin-left:auto;font-size:12px;color:var(--text2);text-align:right}
 
-/* course strip — the field at a glance */
-.strip{
-  overflow-x:auto;background:var(--card);border:1px solid var(--line);
-  border-radius:var(--radius);padding:12px 10px 8px;margin-bottom:12px;
-}
-.strip-grid{display:grid;grid-auto-flow:column;grid-auto-columns:34px;gap:0;min-width:max-content}
-.strip-col{display:flex;flex-direction:column;align-items:center;gap:4px;border-left:1px dashed #E4E2D6;padding:2px 0 6px}
-.strip-col:first-child{border-left:none}
-.strip-hole{font-size:.68rem;font-weight:800;color:var(--ink-soft);font-family:var(--mono)}
-.dot{
-  width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  color:#fff;font-size:.62rem;font-weight:800;font-family:var(--mono);
-}
-.dot.g{background:var(--green)}.dot.a{background:var(--amber)}.dot.r{background:var(--red)}
-.dot.p{background:#B9B7AA}.dot.d{background:var(--ink)}
+/* NAV TABS */
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:.75rem}
+.tab{background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--r);padding:8px 12px;font-size:13px;cursor:pointer;color:var(--text2);white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:background .15s}
+.tab.active{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-border);font-weight:500}
+.tab:hover:not(.active){background:var(--bg2)}
+.sec{display:none}.sec.active{display:block}
 
-/* group cards */
-.gcard{
-  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-  padding:12px 14px;margin-bottom:8px;border-left:5px solid var(--line);cursor:pointer;
-}
-.gcard.st-green{border-left-color:var(--green)}
-.gcard.st-amber{border-left-color:var(--amber)}
-.gcard.st-red{border-left-color:var(--red)}
-.gcard.st-done{border-left-color:var(--ink)}
-.gcard .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.gcard .name{font-weight:800}
-.gcard .players{font-size:.82rem;color:var(--ink-soft);margin-top:2px}
-.gcard .stats{display:flex;gap:14px;margin-top:8px;font-size:.82rem;flex-wrap:wrap}
-.gcard .stats b{font-family:var(--mono)}
+/* CARDS */
+.card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);padding:1rem;margin-bottom:.75rem}
+.card-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px}
+.card-title{font-size:15px;font-weight:500}
 
-/* hole table */
-table.holes{width:100%;border-collapse:collapse;font-size:.85rem}
-table.holes th{
-  text-align:left;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--ink-soft);padding:6px 4px;border-bottom:1.5px solid var(--ink)
-}
-table.holes td{padding:7px 4px;border-bottom:1px solid var(--line)}
-.tp{color:var(--green);font-weight:700}
-.tm{color:var(--red);font-weight:700}
+/* FORMS */
+label{font-size:12px;color:var(--text2);display:block;margin-bottom:3px;margin-top:10px}
+input,select,textarea{width:100%;font-size:15px;padding:9px 11px;border:0.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);outline:none;-webkit-appearance:none}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-bg)}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+@media(max-width:400px){.row2{grid-template-columns:1fr}.row3{grid-template-columns:1fr 1fr}}
 
-/* player screen */
-.status-hero{border-radius:var(--radius);padding:22px 18px;text-align:center;margin-bottom:12px;border:1px solid var(--line)}
-.status-hero.st-green{background:var(--green-bg)}
-.status-hero.st-amber{background:var(--amber-bg)}
-.status-hero.st-red{background:var(--red-bg)}
-.status-hero.st-pending,.status-hero.st-done{background:var(--card)}
-.status-hero .word{font-size:1.5rem;font-weight:900;letter-spacing:.04em;text-transform:uppercase}
-.st-green .word{color:var(--green)}.st-amber .word{color:var(--amber)}.st-red .word{color:var(--red)}
-.status-hero .detail{margin-top:8px;font-size:.95rem}
-.status-hero .target{margin-top:6px;font-size:.85rem;color:var(--ink-soft)}
+/* BUTTONS */
+.btn{background:transparent;border:0.5px solid var(--border2);border-radius:var(--r);padding:8px 14px;font-size:13px;cursor:pointer;color:var(--text);-webkit-tap-highlight-color:transparent;transition:background .12s}
+.btn:hover{background:var(--bg2)}
+.btn:active{opacity:.75}
+.btn-primary{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-border)}
+.btn-success{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.btn-danger{color:var(--red);border-color:var(--red-border)}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-full{width:100%;padding:11px;font-size:14px;font-weight:500}
+.btn-icon{padding:6px 8px;font-size:14px}
 
-/* player schedule grid */
-.hgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
-@media(min-width:480px){.hgrid{grid-template-columns:repeat(6,1fr)}}
-.hcell{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 4px;text-align:center;cursor:pointer}
-.hcell .hc-num{font-size:.66rem;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em}
-.hcell .hc-lbl{font-size:.56rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin-top:3px}
-.hcell .hc-t{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;font-size:.82rem}
-.hcell .hc-act{font-size:.68rem;font-family:var(--mono);margin-top:4px;font-weight:700}
-.hcell.past{opacity:.5}
-.hcell.now{background:var(--green);border-color:var(--green);transform:scale(1.06);box-shadow:0 3px 10px rgba(29,122,70,.35);opacity:1;position:relative;z-index:1}
-.hcell.now .hc-num,.hcell.now .hc-lbl{color:#CFE7D8}
-.hcell.now .hc-t,.hcell.now .hc-act{color:#fff}
+/* BADGES */
+.badge{display:inline-block;border-radius:20px;font-size:11px;padding:2px 8px;font-weight:500}
+.badge-18{background:var(--green-bg);color:var(--green)}
+.badge-9{background:var(--blue-bg);color:var(--blue)}
 
-/* log */
-.logline{display:flex;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);font-size:.85rem}
-.logline .t{font-family:var(--mono);color:var(--ink-soft);white-space:nowrap}
-.logline.lr .m{color:var(--red);font-weight:600}
-.logline.lg .m{color:var(--green)}
+/* GROUPS LIST */
+.group-row{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border:0.5px solid var(--border);border-radius:var(--r);background:var(--bg2);margin-bottom:6px;cursor:pointer;transition:background .12s}
+.group-row:hover{background:var(--bg3)}
+.group-row.dragging{opacity:.5;border:1.5px dashed var(--blue)}
+.group-row.drag-over{border-top:2.5px solid var(--blue)}
+.group-time{background:var(--blue-bg);color:var(--blue);border-radius:var(--r);font-size:12px;padding:3px 8px;font-weight:600;white-space:nowrap;min-width:54px;text-align:center}
+.group-hole{font-size:10px;color:var(--text2);text-align:center;margin-top:2px}
+.group-body{flex:1;min-width:0}
+.group-name{font-weight:500;font-size:13px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.group-players{font-size:12px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.group-actions{display:flex;gap:4px;flex-shrink:0}
 
-/* tabs / nav */
-nav{
-  position:fixed;bottom:0;left:0;right:0;background:var(--ink);
-  display:flex;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));
-  z-index:10;
-}
-nav button{
-  background:none;border:none;color:#9DB3A7;font-size:.68rem;font-weight:700;
-  letter-spacing:.06em;text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:3px;
-  padding:6px 10px;border-radius:8px;flex:1;
-}
-nav button .ic{font-size:1.15rem;line-height:1}
-nav button.on{color:#fff;background:rgba(255,255,255,.12)}
-.screen{display:none}.screen.on{display:block}
+/* DRAG HANDLE */
+.drag-handle{cursor:grab;color:var(--text3);padding:2px 4px;font-size:16px;touch-action:none}
 
-.tabbar{display:flex;gap:6px;margin-bottom:12px}
-.tabbar button{flex:1;background:#ECEAE0;color:var(--ink);font-weight:700;padding:10px;font-size:.85rem}
-.tabbar button.on{background:var(--ink);color:#fff}
+/* UPLOAD ZONES */
+.upload-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+@media(max-width:480px){.upload-grid{grid-template-columns:1fr}}
+.upload-btn{border:1.5px dashed var(--border2);border-radius:var(--rl);padding:1.25rem .75rem;text-align:center;cursor:pointer;color:var(--text2);transition:background .15s;background:var(--bg)}
+.upload-btn:hover{background:var(--bg2);border-color:var(--blue)}
+.upload-btn .icon{font-size:24px;margin-bottom:6px}
+.upload-btn .label{font-size:13px;font-weight:500;color:var(--text)}
+.upload-btn .sub{font-size:11px;margin-top:3px}
 
-.banner{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);border-radius:8px;padding:10px;font-size:.82rem;margin-bottom:10px;display:none}
-.toast{
-  position:fixed;bottom:86px;left:50%;transform:translateX(-50%);
-  background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:.85rem;font-weight:600;
-  opacity:0;transition:opacity .25s;pointer-events:none;z-index:20;white-space:nowrap;
-}
-.toast.show{opacity:1}
-.timepar-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.timepar-grid label{font-size:.75rem;font-weight:700;color:var(--ink-soft)}
-.timepar-grid input{padding:8px;text-align:center;font-family:var(--mono)}
-details{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);margin-bottom:8px}
-details summary{padding:12px 14px;font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
-details summary::after{content:"+";font-weight:800}
-details[open] summary::after{content:"–"}
-details .inner{padding:0 14px 14px}
-.drawrow{display:grid;grid-template-columns:64px 46px 50px 1fr 28px;gap:5px;margin-bottom:6px;align-items:center}
-.drawrow.drawhead{margin-bottom:2px}
-.drawrow.drawhead span{font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
-.drawrow input{padding:8px}
-.drawrow button{padding:6px;background:transparent;color:var(--red);font-size:1.1rem}
-@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+/* INLINE FORM */
+.inline-form{background:var(--bg2);border-radius:var(--r);padding:12px;margin-bottom:12px;border:0.5px solid var(--border)}
+
+/* SEARCH INPUT WITH ICON */
+.search-wrap{position:relative;margin-bottom:12px}
+.search-wrap input{padding-left:34px}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px;pointer-events:none}
+
+/* INTERVAL GRID */
+.interval-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+@media(max-width:500px){.interval-grid{grid-template-columns:repeat(4,1fr)}}
+.int-cell{text-align:center}
+.int-cell label{font-size:10px;margin:0 0 2px}
+.int-cell input{text-align:center;padding:6px 2px;font-size:14px}
+
+/* PLAYER VIEW */
+.clock-bar{background:var(--blue);border-radius:var(--rl);padding:14px 16px;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between}
+.clock-time{font-size:28px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
+.clock-info{text-align:right}
+.clock-event{font-size:13px;font-weight:500;color:rgba(255,255,255,.9)}
+.clock-date{font-size:11px;color:rgba(255,255,255,.65);margin-top:2px}
+.search-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);padding:1.25rem;margin-bottom:1rem}
+.search-card h2{font-size:20px;font-weight:600;margin-bottom:4px}
+.search-card p{font-size:14px;color:var(--text2);margin-bottom:1rem}
+.tab-row{display:flex;gap:8px;margin-bottom:14px}
+.stab{flex:1;text-align:center;padding:9px;border:0.5px solid var(--border2);border-radius:20px;font-size:13px;cursor:pointer;color:var(--text2);background:transparent;-webkit-tap-highlight-color:transparent}
+.stab.active{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-border);font-weight:500}
+
+/* TEE CARD */
+.tee-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--rl);padding:1rem;margin-bottom:1rem}
+.tee-card.h18{border-left:4px solid var(--green)}
+.tee-card.h9{border-left:4px solid var(--blue)}
+.tee-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:10px;border-bottom:0.5px solid var(--border)}
+.tee-title{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tee-badge{background:var(--green-bg);color:var(--green);border-radius:var(--r);font-size:14px;padding:5px 12px;font-weight:600;white-space:nowrap}
+.status-bar{border-radius:var(--r);padding:10px 14px;font-size:14px;font-weight:600;margin-bottom:10px}
+.status-now{background:#00c853;color:#003d1a}
+.status-done{background:var(--green-bg);color:var(--green)}
+.status-soon{background:var(--blue-bg);color:var(--blue)}
+
+/* HOLE GRID */
+.holes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+@media(min-width:480px){.holes-grid{grid-template-columns:repeat(6,1fr)}}
+.hole{background:var(--bg2);border-radius:var(--r);padding:8px 4px;text-align:center}
+.hole.past{opacity:.38}
+.hole.now{background:#00c853;transform:scale(1.08);position:relative;z-index:1;box-shadow:0 4px 14px rgba(0,200,83,.4)}
+.hole-num{font-size:10px;color:var(--text2);margin-bottom:1px}
+.hole-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px;font-weight:600}
+.hole-time{font-size:13px;font-weight:700}
+.hole-by{font-size:13px;font-weight:700;margin-top:2px}
+.hole.now .hole-num{color:#005c28;font-weight:600}
+.hole.now .hole-lbl{color:#005c28}
+.hole.now .hole-time{color:#003d1a;font-size:14px}
+.hole.now .hole-by{color:#003d1a;font-size:14px;margin-top:3px}
+
+/* FIELD VIEW (schedule-based positions) */
+.fchip{border-radius:20px;font-size:12px;font-weight:600;padding:6px 10px;white-space:nowrap;align-self:center}
+.fchip-now{background:#00c853;color:#003d1a}
+.fchip-soon{background:var(--blue-bg);color:var(--blue)}
+.fchip-done{background:var(--green-bg);color:var(--green)}
+
+/* ACTUAL PACE (player taps) */
+.pace-bar{border-radius:var(--r);padding:10px 14px;font-size:14px;font-weight:600;margin-bottom:10px}
+.pace-ahead{background:var(--green-bg);color:var(--green)}
+.pace-behind{background:var(--red-bg);color:var(--red)}
+.finish-btn{width:100%;padding:12px;font-size:15px;font-weight:600;margin:2px 0 8px;background:var(--blue);color:#fff;border:none;border-radius:var(--r);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.finish-btn:active{opacity:.8}
+.finish-links{display:flex;justify-content:space-between;font-size:12px;margin:0 0 10px}
+.finish-links a{color:var(--text2)}
+.hole-act{font-size:10px;font-weight:700;margin-top:3px}
+.act-ahead{color:var(--green)}.act-behind{color:var(--red)}
+.hole.now .hole-act{color:#003d1a}
+
+/* EMPTY / STATUS */
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--text2);font-size:14px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+.dot-green{background:#22c55e}.dot-amber{background:#f59e0b}.dot-red{background:#ef4444}
+.status-msg{font-size:12px;color:var(--text2);margin-top:8px;min-height:16px}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--bg);border-radius:var(--rl) var(--rl) 0 0;padding:1.5rem 1.25rem;width:100%;max-width:520px;border:0.5px solid var(--border);max-height:90vh;overflow-y:auto}
+@media(min-width:600px){.overlay{align-items:center}.modal{border-radius:var(--rl)}}
+
+/* QR */
+.qr-wrap{display:flex;justify-content:center;margin:1rem 0}
+.qr-wrap>div{background:#fff;padding:12px;border-radius:var(--r);display:inline-block}
+.qr-poster{display:none;text-align:center;padding:2rem}
+
+/* PRINT */
 @media print{
-  header.app,nav,.toast,.banner{display:none!important}
-  main>*:not(#printArea){display:none!important}
-  #printArea{display:block!important}
-  body{background:#fff;padding-bottom:0}
-  .psheet{page-break-inside:avoid;border:1px solid #bbb;border-radius:8px;padding:12px;margin-bottom:12px}
-  .psheet table{width:100%;border-collapse:collapse;font-size:11px}
-  .psheet th,.psheet td{border-bottom:1px solid #ddd;padding:3px 4px;text-align:left}
+  .tabs,.print-hide{display:none!important}
+  #sec-print{display:block!important}
+  .tee-card{page-break-inside:avoid}
+  body{background:#fff}
+  .qr-poster{display:block!important}
+  .card{border:1px solid #ccc}
 }
-.psheet{background:var(--card)}
-@media (min-width:700px){ .timepar-grid{grid-template-columns:repeat(6,1fr)} }
 </style>
 </head>
 <body>
-<header class="app">
-  <h1>Pace of Play</h1>
-  <div class="event" id="hdrEvent">No event set up</div>
+<div class="shell" id="app">
+
+<header class="hdr">
+  <div class="hdr-logo">⛳</div>
+  <div>
+    <div class="hdr-title" id="hdr-title">Golf Pace of Play</div>
+    <div class="hdr-sub" id="hdr-sub">Bay of Plenty Golf</div>
+  </div>
+  <div class="hdr-right" id="hdr-right"></div>
 </header>
-<main>
-<div class="banner" id="storeBanner">Storage is unavailable in this browser view — data will not survive a refresh. Hosted on your own site (e.g. GitHub Pages) everything saves automatically.</div>
 
-<!-- ============ ROLE CHOICE ============ -->
-<section class="screen" id="scr-role">
-  <h2>Who's using this phone?</h2>
+<div class="tabs print-hide" id="main-tabs">
+  <button type="button" class="tab active" onclick="goTab('events',this)">📋 Events</button>
+  <button type="button" class="tab" onclick="goTab('draw',this)">📥 Draw</button>
+  <button type="button" class="tab" onclick="goTab('field',this)">🏳 Field</button>
+  <button type="button" class="tab" onclick="goTab('intervals',this)">⏱ Intervals</button>
+  <button type="button" class="tab" onclick="goTab('player',this)">👤 Player</button>
+  <button type="button" class="tab" onclick="goTab('share',this)">📲 Share</button>
+  <button type="button" class="tab" onclick="goTab('print',this)">🖨 Print</button>
+</div>
+
+<!-- ═══════════════ EVENTS ═══════════════ -->
+<div id="sec-events" class="sec active">
   <div class="card">
-    <button class="big" onclick="chooseOfficial()">Official / Committee</button>
-    <p class="muted small" style="margin:8px 2px 0">Full access: draw setup, field monitoring, timing every group, log and records. Protected by an admin PIN.</p>
-  </div>
-  <div class="card">
-    <button class="big ghost" onclick="choosePlayer()">Player / Parent</button>
-    <p class="muted small" style="margin:8px 2px 0">See the field, pick your group, and record your own hole-out times. Event setup stays locked.</p>
-  </div>
-</section>
-
-<!-- ============ FIELD (official) ============ -->
-<section class="screen" id="scr-field">
-  <h2>Field position</h2>
-  <div class="strip" id="strip"></div>
-  <div id="fieldList"></div>
-  <div class="card muted small" id="fieldEmpty" style="display:none">
-    No groups yet. Officials: load the draw under the <b>Draw</b> tab. Players: load the official's event file from the <b>Player</b> tab.
-  </div>
-</section>
-
-<!-- ============ GROUP DETAIL (official) ============ -->
-<section class="screen" id="scr-group">
-  <button class="subtle" onclick="show('field')" style="margin-bottom:10px">&larr; Back to field</button>
-  <div id="groupDetail"></div>
-</section>
-
-<!-- ============ PLAYER ============ -->
-<section class="screen" id="scr-player">
-  <h2>My group</h2>
-  <div class="card" id="myGroupCard"></div>
-  <div id="playerEvent"></div>
-  <div id="playerPanel"></div>
-  <p class="muted small" style="text-align:center;margin-top:18px"><a href="#" onclick="chooseOfficial();return false" style="color:var(--ink-soft)">Official sign-in</a></p>
-</section>
-
-<!-- ============ DRAW / SETUP ============ -->
-<section class="screen" id="scr-draw">
-  <h2>Event</h2>
-  <div class="card">
-    <label class="f"><span>Event name</span><input id="setName" placeholder="e.g. Waikato Strokeplay — Round 1"></label>
-    <div class="row">
-      <label class="f"><span>Date</span><input id="setDate" type="date"></label>
-      <label class="f"><span>Tee interval (min)</span><input id="setInterval" type="number" min="6" max="15" step="1"></label>
-      <label class="f"><span>Course</span><select id="setCourse"><option value="18">18 holes</option><option value="9">9 holes</option></select></label>
+    <div class="card-hdr">
+      <span class="card-title">Events</span>
+      <button type="button" class="btn btn-sm btn-primary" onclick="showNewEventForm()">+ New event</button>
     </div>
-    <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:.9rem">
-      <input type="checkbox" id="setTeams" style="width:auto"> Teams event — players may switch their group themselves
-    </label>
-    <button class="ghost" onclick="saveEventSettings()">Save event details</button>
-  </div>
-
-  <h2>Load the draw</h2>
-  <div class="tabbar">
-    <button id="dt-paste" class="on" onclick="drawTab('paste')">Paste</button>
-    <button id="dt-file" onclick="drawTab('file')">File</button>
-    <button id="dt-manual" onclick="drawTab('manual')">Manual</button>
-  </div>
-
-  <div class="card" id="draw-paste">
-    <p class="muted small" style="margin-bottom:8px">Copy the draw from anywhere — DotGolf, a website, Word, an email — and paste it here. Lines with a tee time start a new group; names on that line and the lines below join it. Start holes ("Tee 10") and round length ("9 holes", "Futures 18") are picked up too — and everything is editable before you confirm.</p>
-    <textarea id="pasteBox" rows="8" placeholder="8:00 am  J Smith, A Brown, T Wilson&#10;8:09 am  K Patel, M Ngata, R Green&#10;..."></textarea>
-    <button class="big" style="margin-top:10px" onclick="parsePaste()">Read draw from text</button>
-  </div>
-
-  <div class="card" id="draw-file" style="display:none">
-    <p class="muted small" style="margin-bottom:8px">Upload a CSV, Excel (.xlsx), Word (.docx), PDF or text file — or a <b>photo/screenshot</b> of a paper draw (text is read from the image). Excel/Word/PDF/photo need internet the <em>first</em> time (to fetch a reader); after that they work offline too. CSV and text always work offline — as does Paste.</p>
-    <input type="file" id="fileBox" accept=".csv,.txt,.xlsx,.xls,.docx,.pdf,image/*" onchange="parseFile(this.files[0])">
-    <p class="muted small" id="fileMsg" style="margin-top:8px"></p>
-  </div>
-
-  <div class="card" id="draw-manual" style="display:none">
-    <p class="muted small" style="margin-bottom:8px">Add groups one by one. Tee times auto-fill from the first time plus your interval.</p>
-    <button class="ghost" onclick="manualAdd()">+ Add group</button>
-    <div id="manualRows" style="margin-top:10px"></div>
-    <button class="big" onclick="manualUse()" id="manualUseBtn" style="display:none">Use these groups</button>
-  </div>
-
-  <div id="drawPreview"></div>
-
-  <h2>Upcoming rounds</h2>
-  <div id="upcomingList" class="card muted small">No rounds queued. When a draw file contains several rounds ("Round 1", "Round 2"...) the later ones queue here automatically — or queue any parsed draw from the preview.</div>
-
-  <h2>Current draw</h2>
-  <div id="drawCurrent" class="card muted small">No draw loaded.</div>
-
-  <h2>Time par</h2>
-  <div class="card">
-    <p class="muted small" style="margin-bottom:10px">Minutes allowed per hole. Total: <b class="num" id="tpTotal"></b></p>
-    <div class="timepar-grid" id="tpGrid"></div>
-    <div class="row" style="margin-top:10px">
-      <button class="ghost" onclick="tpSpread()">Spread a round time evenly</button>
-      <button class="ghost" onclick="saveTimePar()">Save time par</button>
-    </div>
-  </div>
-
-  <h2>Out-of-position thresholds</h2>
-  <div class="card">
-    <p class="muted small" style="margin-bottom:10px">Minutes beyond the starting interval (or beyond time par for the first group) before a group is flagged.</p>
-    <div class="row">
-      <label class="f"><span>Drifting (amber)</span><input id="thAmber" type="number" min="1" max="15"></label>
-      <label class="f"><span>Out of position (red)</span><input id="thRed" type="number" min="2" max="25"></label>
-    </div>
-    <button class="ghost" onclick="saveThresholds()">Save thresholds</button>
-  </div>
-</section>
-
-<!-- ============ LOG ============ -->
-<section class="screen" id="scr-log">
-  <h2>Event log</h2>
-  <div class="card">
-    <div class="row">
-      <select id="noteGroup"></select>
-      <input id="noteText" placeholder="Add a note (e.g. 'ruling on 12, 6 min')">
-    </div>
-    <button class="ghost" style="margin-top:8px" onclick="addNote()">Add note</button>
-  </div>
-  <div class="card" id="logList"></div>
-</section>
-
-<!-- ============ RECORDS / MORE ============ -->
-<section class="screen" id="scr-more">
-  <h2>Share with players — QR code</h2>
-  <div class="card">
-    <p class="muted small" style="margin-bottom:10px">Players scan this and the event opens on their phone in player mode — draw, time par and settings included. Print it for the noticeboard or first tee. (Generating the QR needs internet once; scanning players need internet to open the page the first time, then it works offline.)</p>
-    <button class="ghost" onclick="makeQR()">Generate QR &amp; link</button>
-    <div id="qrWrap" style="display:none;margin-top:12px;text-align:center">
-      <div id="qrBox" style="display:inline-block;background:#fff;padding:12px;border-radius:8px"></div>
-      <div id="qrUrl" class="muted small" style="word-break:break-all;margin-top:10px;text-align:left"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost" onclick="copyShare()">Copy link</button>
-        <button class="ghost" onclick="printQR()">Print QR poster</button>
+    <div id="new-event-form" class="inline-form" style="display:none">
+      <div><label>Event name</label><input id="ev-name" placeholder="e.g. Futures — Opotiki Round 1" onkeydown="if(event.key==='Enter')newEvent()"/></div>
+      <div class="row2" style="margin-top:0">
+        <div><label>Course</label><input id="ev-course" placeholder="e.g. Opotiki Golf Club" onkeydown="if(event.key==='Enter')newEvent()"/></div>
+        <div><label>Date</label><input type="date" id="ev-date"/></div>
       </div>
-      <div id="qrMsg" class="muted small" style="margin-top:6px"></div>
-    </div>
-  </div>
-
-  <h2>Print</h2>
-  <div class="card">
-    <p class="muted small" style="margin-bottom:10px">Prints every group's hole-by-hole schedule (tee-off and finish-by times) — one sheet section per group, for the noticeboard.</p>
-    <button class="ghost" onclick="printSchedules()">Print schedule sheets</button>
-  </div>
-
-  <h2>Hand this phone over</h2>
-  <div class="card">
-    <p class="muted small" style="margin-bottom:10px">Locks the app to player/parent mode — no access to setup, log, records or erase. Your admin PIN gets back in via "Official sign-in" on the Player screen.</p>
-    <button class="ghost" onclick="lockToPlayer()">Lock to player mode</button>
-  </div>
-
-  <h2>Finish this round</h2>
-  <div class="card">
-    <p class="muted small" style="margin-bottom:10px">Archives every group's times into Records and clears the live field, ready for the next round. The draw and settings are kept.</p>
-    <button class="big ghost" onclick="archiveRound()">Archive round to records</button>
-  </div>
-
-  <h2>Records</h2>
-  <div id="recordsList"></div>
-
-  <h2>Move data between phones</h2>
-  <div class="card">
-    <p class="muted small" style="margin-bottom:10px">No internet means phones can't sync live. Instead: players export from their phone, the official imports — times merge into the matching groups.</p>
-    <div class="row">
-      <button class="ghost" onclick="exportJSON()">Export data file</button>
-      <button class="ghost" onclick="document.getElementById('importBox').click()">Import &amp; merge</button>
-    </div>
-    <input type="file" id="importBox" accept=".json" style="display:none" onchange="importJSON(this.files[0])">
-  </div>
-
-  <h2>Danger zone</h2>
-  <div class="card">
-    <button class="danger" onclick="wipe()">Erase everything on this phone</button>
-  </div>
-</section>
-<div id="printArea" style="display:none"></div>
-</main>
-
-<nav>
-  <button id="nb-field" onclick="show('field')"><span class="ic">&#9873;</span>Field</button>
-  <button id="nb-player" onclick="show('player')"><span class="ic">&#9678;</span>Player</button>
-  <button id="nb-draw" onclick="show('draw')"><span class="ic">&#9776;</span>Draw</button>
-  <button id="nb-log" onclick="show('log')"><span class="ic">&#9998;</span>Log</button>
-  <button id="nb-more" onclick="show('more')"><span class="ic">&#9733;</span>More</button>
-</nav>
-<div class="toast" id="toast"></div>
-<script>
-/* ================= STATE ================= */
-const DEFAULT_TP = [14,14,12,14,17,14,12,14,17, 14,14,12,14,17,14,12,14,17]; // 4h16 default, edit to suit
-let mem = null; // in-memory fallback
-function blank(){
-  return {
-    settings:{ name:"", date:new Date().toISOString().slice(0,10), interval:9,
-               courseHoles:18, pin:null,
-               timePar:DEFAULT_TP.slice(), thAmber:3, thRed:8 },
-    role:null,           // null = not chosen yet | 'official' | 'player'
-    groups:[],           // {id,name,players:[],start:"HH:MM",startHole,holes,fin:[minOfDay|null],lastStatus}
-    log:[],              // {t:minOfDay, dt:iso, g:groupName, type:'auto'|'note', msg, sev}
-    records:[],          // archived rounds
-    myGroup:null
-  };
-}
-function migrate(s){
-  s.role=s.role??null;
-  s.upcoming=s.upcoming||[];
-  s.settings.teamsEvent=s.settings.teamsEvent||false;
-  s.settings.courseHoles=s.settings.courseHoles||18;
-  s.settings.pin=s.settings.pin||null;
-  (s.groups||[]).forEach(g=>{ g.startHole=g.startHole||1; g.holes=g.holes||18; });
-  return s;
-}
-function load(){
-  try{ const raw=localStorage.getItem('pace-v1'); if(raw) return JSON.parse(raw); }
-  catch(e){ document.getElementById('storeBanner').style.display='block'; }
-  return mem || blank();
-}
-function save(){
-  try{ localStorage.setItem('pace-v1', JSON.stringify(S)); }
-  catch(e){ mem=S; document.getElementById('storeBanner').style.display='block'; }
-}
-let S = migrate(load());
-
-/* ================= HELPERS ================= */
-const $ = id=>document.getElementById(id);
-const CH = ()=>+S.settings.courseHoles||18;              // holes on the course
-function gHoles(g){ return +g.holes || (CH()===9?9:18); } // holes this group plays
-/* k-th hole played (k=0-based) for a group starting on g.startHole,
-   wrapping past the last hole: start 10 -> 10..18 then 1..9 */
-function holeSeq(g,k){ return (((g.startHole||1)-1+k) % CH())+1; }
-/* time par allowed for this group's first n holes, in play order */
-function cumParG(g,n){
-  let t=0; for(let k=0;k<n;k++) t+= +S.settings.timePar[(((g.startHole||1)-1+k)%CH())] || 14;
-  return t;
-}
-function parG(g){ return cumParG(g,gHoles(g)); }
-function nowMin(){ const d=new Date(); return d.getHours()*60+d.getMinutes()+d.getSeconds()/60; }
-function hm(min){ if(min==null) return "–";
-  min=((min%1440)+1440)%1440;
-  const h=Math.floor(min/60), m=Math.floor(min%60);
-  return h.toString().padStart(2,'0')+":"+m.toString().padStart(2,'0');
-}
-function toMin(str){ // "8:05", "8.05 am", "13:40"
-  if(!str) return null;
-  const m=String(str).trim().match(/^(\d{1,2})[:.](\d{2})\s*(am|pm)?$/i);
-  if(!m) return null;
-  let h=+m[1]; const mi=+m[2];
-  if(m[3]){ const ap=m[3].toLowerCase(); if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0; }
-  return h*60+mi;
-}
-function signed(mins){ const r=Math.round(mins); return (r>0?"+":"")+r; }
-function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2200); }
-function cumPar(n){ return S.settings.timePar.slice(0,n).reduce((a,b)=>a+ +b,0); }
-/* "Thru" = the LATEST hole with a recorded time. Earlier blanks are allowed,
-   so an official catching up a group that stopped self-recording can enter
-   just the most recent known hole and the status updates from there. */
-function holesDone(g){ const gh=gHoles(g); let n=0; for(let k=0;k<gh;k++) if(g.fin[k]!=null) n=k+1; return n; }
-
-/* ================= POSITION ENGINE =================
-   In position (green)  : within thresholds
-   Drifting (amber)     : more than thAmber beyond interval / time par
-   Out of position (red): more than thRed beyond interval AND behind time par
-   The group ahead is the previous group in the draw off the SAME start hole;
-   a group with no one ahead of it is judged on time par alone.            */
-function groupAheadOf(gi){
-  const sh=S.groups[gi].startHole||1;
-  for(let j=gi-1;j>=0;j--) if((S.groups[j].startHole||1)===sh) return S.groups[j];
-  return null;
-}
-function statusOf(gi){
-  const g=S.groups[gi];
-  const n=holesDone(g), gh=gHoles(g);
-  const start=toMin(g.start);
-  if(n===0) return {code:'pending', n:0, vsPar:null, gapEx:null, msg:"Not started"};
-  const finish=g.fin[n-1];
-  const vsPar = finish - (start + cumParG(g,n));        // + = behind time par
-  let gapEx=null;
-  const a=groupAheadOf(gi);
-  if(a && a.fin[n-1]!=null){
-    const gap = finish - a.fin[n-1];
-    gapEx = gap - (start - toMin(a.start));             // + = further back than the starting interval
-  }
-  const A=+S.settings.thAmber, R=+S.settings.thRed;
-  const basis = (gapEx==null) ? vsPar : gapEx;
-  let code='green';
-  if(basis>A) code='amber';
-  if(basis>R) code = (gapEx!=null && vsPar<=0) ? 'amber' : 'red';
-  if(n===gh) code='done';
-  return {code, n, gh, vsPar, gapEx, finish};
-}
-function statusWord(c){ return {green:"In position",amber:"Drifting",red:"Out of position",pending:"Not started",done:"Finished"}[c]; }
-
-/* Auto-log transitions; called after any time is recorded/edited */
-function refreshStatuses(){
-  S.groups.forEach((g,i)=>{
-    const st=statusOf(i);
-    const prev=g.lastStatus||'pending';
-    if(st.code!==prev && st.code!=='pending'){
-      const lbl = st.n>0 ? "hole "+holeSeq(g,st.n-1) : "";
-      if(st.code==='red'){
-        logAdd(g.name, `flagged OUT OF POSITION after ${lbl} — ${signed(st.vsPar)} min v time par`+(st.gapEx!=null?`, ${signed(st.gapEx)} min beyond interval to group ahead`:""), 'red');
-      }else if(prev==='red'){
-        logAdd(g.name, `back ${st.code==='green'?'in position':'to drifting'} after ${lbl} (${signed(st.vsPar)} min v time par)`, 'green');
-      }else if(st.code==='done'){
-        const total=g.fin[gHoles(g)-1]-toMin(g.start);
-        logAdd(g.name, `completed ${gHoles(g)} holes in ${Math.floor(total/60)}h ${Math.round(total%60).toString().padStart(2,'0')}m (${signed(st.vsPar)} min v time par)`, st.vsPar<=0?'green':'red');
-      }
-      g.lastStatus=st.code;
-    }
-  });
-}
-function logAdd(gname,msg,sev){
-  S.log.unshift({t:nowMin(), dt:new Date().toISOString(), g:gname, msg, sev:sev||''});
-}
-
-/* ================= RECORD / EDIT TIMES ================= */
-function recordFinish(gi){
-  const g=S.groups[gi], n=holesDone(g);
-  if(n>=gHoles(g)) return;
-  g.fin[n]=nowMin();
-  refreshStatuses(); save(); renderAll();
-  toast(`${g.name}: hole ${holeSeq(g,n)} recorded at ${hm(g.fin[n])}`);
-}
-function undoFinish(gi){
-  const g=S.groups[gi], n=holesDone(g);
-  if(!n) return;
-  if(!confirm(`Remove the hole ${holeSeq(g,n-1)} time for ${g.name}?`)) return;
-  g.fin[n-1]=null; g.lastStatus=null;
-  refreshStatuses(); save(); renderAll();
-}
-function editFinish(gi,k){
-  const g=S.groups[gi];
-  const cur=g.fin[k]!=null?hm(g.fin[k]):"";
-  const v=prompt(`${g.name} — time holed out on ${holeSeq(g,k)} (24h HH:MM):`,cur);
-  if(v===null) return;
-  if(v.trim()===""){ g.fin[k]=null; }
-  else{ const m=toMin(v); if(m==null){ alert("Use HH:MM, e.g. 10:42"); return; } g.fin[k]=m; }
-  g.lastStatus=null; refreshStatuses(); save(); renderAll();
-}
-/* Player missed some taps: record "now" against the hole they name */
-function recordAtHole(gi){
-  const g=S.groups[gi], gh=gHoles(g);
-  const v=prompt("Which hole did you just finish? (the hole number on the course)");
-  if(v===null) return;
-  const hn=+v;
-  if(!hn){ alert("Enter the hole number, e.g. 7"); return; }
-  let k=-1;
-  for(let j=0;j<gh;j++) if(holeSeq(g,j)===hn && g.fin[j]==null){ k=j; break; }
-  if(k<0){ alert(`Couldn't match hole ${hn} — it's already recorded or isn't in your ${gh} holes.`); return; }
-  g.fin[k]=nowMin(); g.lastStatus=null; refreshStatuses(); save(); renderAll();
-  toast(`Hole ${hn} recorded at ${hm(g.fin[k])}`);
-}
-/* Where the time par schedule says a group should be right now is computed
-   inline in renderPlayer (schedHole) and refreshed on a timer. */
-
-/* Full round schedule: every hole with its planned tee-off and finish-by time
-   (in play order, wrap-aware), the clock-current hole highlighted, recorded
-   holes ticked with their actual +/-; tap any cell to set or fix a time. */
-function scheduleGrid(gi){
-  const g=S.groups[gi], gh=gHoles(g), start=toMin(g.start), now=nowMin();
-  let cells="";
-  for(let k=0;k<gh;k++){
-    const tee=start+cumParG(g,k), due=start+cumParG(g,k+1);
-    const isNow = now>=tee && now<due;
-    const rec = g.fin[k]!=null;
-    const diff = rec ? g.fin[k]-due : null;
-    cells+=`<div class="hcell${isNow?' now':''}${rec&&!isNow?' past':''}" onclick="editFinish(${gi},${k})">
-      <div class="hc-num">Hole ${holeSeq(g,k)}</div>
-      <div class="hc-lbl">Tee off</div><div class="hc-t">${hm(tee)}</div>
-      <div class="hc-lbl">Finish by</div><div class="hc-t">${hm(due)}</div>
-      ${rec?`<div class="hc-act ${diff>0?'tm':'tp'}">&#10003; ${hm(g.fin[k])} (${signed(diff)})</div>`:""}
-    </div>`;
-  }
-  return `<div class="hgrid">${cells}</div>
-    <p class="muted small" style="margin-top:8px;text-align:center">Times are your time par schedule from your tee time. Tap any hole to set or fix its actual time.</p>`;
-}
-
-/* ================= RENDER: FIELD ================= */
-function renderStrip(){
-  const el=$('strip');
-  if(!S.groups.length){ el.style.display='none'; return; }
-  el.style.display='block';
-  const ch=CH();
-  const byCol=Array.from({length:ch+2},()=>[]); // [0] unused, 1..ch holes, ch+1 finished
-  S.groups.forEach((g,i)=>{
-    const st=statusOf(i);
-    let col;
-    if(st.code==='pending') col=g.startHole||1;         // waiting on their start tee
-    else if(st.code==='done') col=ch+1;
-    else col=holeSeq(g,st.n);                            // the hole they're now playing
-    byCol[col].push({i,g,st});
-  });
-  let html='<div class="strip-grid">';
-  for(let c=1;c<=ch+1;c++){
-    html+=`<div class="strip-col"><div class="strip-hole">${c===ch+1?'FIN':c}</div>`;
-    byCol[c].forEach(({i,g,st})=>{
-      const cls={green:'g',amber:'a',red:'r',pending:'p',done:'d'}[st.code];
-      html+=`<div class="dot ${cls}" title="${esc(g.name)}">${i+1}</div>`;
-    });
-    html+='</div>';
-  }
-  html+='</div>';
-  el.innerHTML=html;
-}
-function renderField(){
-  renderStrip();
-  const list=$('fieldList');
-  $('fieldEmpty').style.display = S.groups.length? 'none':'block';
-  const canOpen = S.role==='official';
-  list.innerHTML = S.groups.map((g,i)=>{
-    const st=statusOf(i);
-    const setup=`Tee ${g.startHole||1} · ${gHoles(g)} holes`;
-    const stats = st.code==='pending'
-      ? `<span>Starts <b class="num">${hm(toMin(g.start))}</b></span><span>${setup}</span>`
-      : `<span>Thru <b class="num">${st.n}/${st.gh}</b></span>
-         <span>v par <b class="num ${st.vsPar>0?'tm':'tp'}">${signed(st.vsPar)}</b></span>`+
-        (st.gapEx!=null?`<span>v interval <b class="num ${st.gapEx>0?'tm':'tp'}">${signed(st.gapEx)}</b></span>`:``)+
-        `<span>${setup}</span><span>Last <b class="num">${hm(st.finish)}</b></span>`;
-    return `<div class="gcard st-${st.code}" ${canOpen?`onclick="openGroup(${i})"`:``} ${canOpen?'':'style="cursor:default"'}>
-      <div class="top"><span class="name">${i+1}. ${esc(g.name)}</span><span class="pill">${statusWord(st.code)}</span></div>
-      <div class="players">${esc(g.players.join(" · "))||"&nbsp;"}</div>
-      <div class="stats">${stats}</div>
-    </div>`;
-  }).join("");
-}
-
-/* ================= RENDER: GROUP DETAIL ================= */
-let openGi=null;
-function openGroup(i){ if(S.role!=='official') return; openGi=i; renderGroup(); show('group'); }
-function renderGroup(){
-  if(openGi==null||!S.groups[openGi]){ show('field'); return; }
-  const g=S.groups[openGi], st=statusOf(openGi), n=st.n, gh=gHoles(g);
-  const start=toMin(g.start);
-  let rows="";
-  for(let k=0;k<gh;k++){
-    const hole=holeSeq(g,k);
-    const due = start!=null ? start+cumParG(g,k+1) : null;
-    const diff = g.fin[k]!=null&&due!=null ? g.fin[k]-due : null;
-    rows+=`<tr onclick="editFinish(${openGi},${k})">
-      <td class="num">${hole}</td>
-      <td class="num">${S.settings.timePar[hole-1]}m</td>
-      <td class="num">${hm(due)}</td>
-      <td class="num">${g.fin[k]!=null?hm(g.fin[k]):"<span class='muted'>tap to set</span>"}</td>
-      <td class="num ${diff>0?'tm':diff!=null?'tp':''}">${diff!=null?signed(diff):""}</td>
-    </tr>`;
-  }
-  $('groupDetail').innerHTML=`
-    <div class="card st-${st.code}">
-      <div class="top" style="display:flex;justify-content:space-between;align-items:center">
-        <b>${openGi+1}. ${esc(g.name)}</b><span class="pill">${statusWord(st.code)}</span>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button type="button" class="btn btn-primary btn-sm" onclick="newEvent()">Create event</button>
+        <button type="button" class="btn btn-sm" onclick="hideNewEventForm()">Cancel</button>
       </div>
-      <div class="muted small" style="margin:4px 0 10px">${esc(g.players.join(" · "))} — ${hm(start)} off tee ${g.startHole||1}, ${gh} holes</div>
-      ${st.code!=='pending'&&st.code!=='done'?`<div class="small" style="margin-bottom:10px">
-        <b class="num ${st.vsPar>0?'tm':'tp'}">${signed(st.vsPar)} min</b> v time par thru ${n}
-        ${st.gapEx!=null?` · <b class="num ${st.gapEx>0?'tm':'tp'}">${signed(st.gapEx)} min</b> beyond interval to group ahead`:""}
-      </div>`:""}
-      ${n<gh?`<button class="big" onclick="recordFinish(${openGi})">Holed out on ${holeSeq(g,n)} — record now</button>`:`<div class="pill" style="background:var(--ink);color:#fff">Round complete</div>`}
-      ${n>0?`<button class="subtle" style="width:100%;margin-top:8px" onclick="undoFinish(${openGi})">Undo hole ${holeSeq(g,n-1)}</button>`:""}
     </div>
+    <div id="event-list"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ DRAW ═══════════════ -->
+<div id="sec-draw" class="sec">
+  <div id="no-event-msg" class="card" style="display:none">
+    <div class="empty">Select or create an event first</div>
+  </div>
+  <div id="draw-content">
+    <!-- Import section -->
     <div class="card">
-      <table class="holes">
-        <tr><th>Hole</th><th>Par</th><th>Due by</th><th>Holed out</th><th>+/−</th></tr>
-        ${rows}
-      </table>
-    </div>`;
+      <div class="card-hdr"><span class="card-title">Import draw</span></div>
+      <div class="upload-grid">
+        <div class="upload-btn" onclick="document.getElementById('pdf-input').click()">
+          <div class="icon">📄</div>
+          <div class="label">PDF</div>
+          <div class="sub">Bay of Plenty draw format</div>
+        </div>
+        <div class="upload-btn" onclick="document.getElementById('img-input').click()">
+          <div class="icon">📸</div>
+          <div class="label">Screenshot / Photo</div>
+          <div class="sub">Reads text from image</div>
+        </div>
+        <div class="upload-btn" onclick="showPasteImport()">
+          <div class="icon">📋</div>
+          <div class="label">Paste text</div>
+          <div class="sub">From Excel, email or website</div>
+        </div>
+      </div>
+      <!-- Shotgun start settings (shown when shotgun draw detected) -->
+      <div id="shotgun-settings" class="inline-form" style="display:none;margin-bottom:8px;border-color:var(--blue-border);background:var(--blue-bg)">
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px;color:var(--blue)">⚡ Shotgun start draw detected</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Starting holes and teams have been read. Confirm the tee time(s) below.</div>
+        <div class="row2" style="margin-top:0">
+          <div><label id="wave1-label">Tee time</label><input type="time" id="shotgun-start" value="08:45"/></div>
+          <div><label>Holes to play</label>
+            <select id="shotgun-holes">
+              <option value="9">9 holes</option>
+              <option value="18">18 holes</option>
+            </select>
+          </div>
+        </div>
+        <div id="wave2-time-row" style="display:none;margin-top:0">
+          <label>2nd wave tee time</label>
+          <input type="time" id="shotgun-start2" value="10:45" oninput="this.dataset.touched='1'"/>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button type="button" class="btn btn-primary" style="flex:1" onclick="confirmShotgunImport()">Import draw</button>
+          <button type="button" class="btn btn-sm" onclick="cancelShotgunImport()">Cancel</button>
+        </div>
+      </div>
+      <div id="upload-grid-bottom" style="display:none">
+      <div style="height:0"></div>
+      </div>
+      <input type="file" id="pdf-input" accept=".pdf,application/pdf" style="display:none" onchange="importPDF(event)"/>
+      <input type="file" id="img-input" accept="image/*" style="display:none" onchange="importImage(event)"/>
+      <div id="paste-form" style="display:none">
+        <label>Paste draw text</label>
+        <textarea id="paste-text" style="height:120px;font-size:13px" placeholder="Paste from Excel, email, or copy text from any webpage..."></textarea>
+        <button type="button" class="btn btn-primary btn-sm" style="margin-top:8px" onclick="importPasteText()">Import</button>
+      </div>
+      <div id="upload-grid-bottom-close"></div>
+      <div id="import-status" class="status-msg"></div>
+    </div>
+
+    <!-- Groups -->
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-title">Groups</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="btn btn-sm" onclick="showAddGroup()">+ Add group</button>
+          <button type="button" class="btn btn-sm btn-danger" onclick="clearGroups()">🗑 Clear all</button>
+        </div>
+      </div>
+
+      <!-- Add group form -->
+      <div id="add-group-form" class="inline-form" style="display:none">
+        <div class="row2">
+          <div><label>Group name</label><input id="ag-name" placeholder="e.g. Group A or Team Mohi"/></div>
+          <div><label>Tee time</label><input type="time" id="ag-time" value="10:00"/></div>
+        </div>
+        <div class="row3" style="margin-top:0">
+          <div><label>Starting hole</label>
+            <select id="ag-hole">
+              <option value="1">Hole 1</option><option value="6">Hole 6</option>
+              <option value="10">Hole 10</option><option value="12">Hole 12</option>
+            </select>
+          </div>
+          <div><label>Holes to play</label>
+            <select id="ag-holes"><option value="18">18</option><option value="9">9</option></select>
+          </div>
+          <div><label>Field</label>
+            <input id="ag-field" placeholder="e.g. Futures 18"/>
+          </div>
+        </div>
+        <div><label>Players (comma-separated)</label>
+          <input id="ag-players" placeholder="Jane Smith, John Doe"/>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button type="button" class="btn btn-primary btn-sm" onclick="addGroup()">Add</button>
+          <button type="button" class="btn btn-sm" onclick="hideAddGroup()">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Filter + search -->
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+        <div class="search-wrap" style="flex:1;min-width:140px;margin:0">
+          <span class="search-icon">🔍</span>
+          <input id="group-search" placeholder="Search groups or players…" oninput="renderGroups()"/>
+        </div>
+        <select id="group-filter" onchange="renderGroups()" style="width:auto;font-size:12px;padding:6px 28px 6px 8px">
+          <option value="all">All fields</option>
+          <option value="18">18 hole</option>
+          <option value="9">9 hole</option>
+        </select>
+      </div>
+      <div id="group-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ FIELD (where every group should be) ═══════════════ -->
+<div id="sec-field" class="sec">
+  <div class="card">
+    <div class="card-hdr">
+      <span class="card-title">Field — where every group should be</span>
+      <span style="font-size:12px;color:var(--text2)" id="field-now"></span>
+    </div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Calculated from tee times and hole intervals — the hole each group should currently be playing and its finish-by time. Refreshes automatically; no recording needed.</p>
+    <div id="field-content"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ INTERVALS ═══════════════ -->
+<div id="sec-intervals" class="sec">
+  <div class="card">
+    <div class="card-hdr">
+      <span class="card-title">Hole intervals</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="margin:0;font-size:12px">Default</label>
+        <input id="default-interval" type="number" min="5" max="30" value="13" style="width:60px;padding:5px 6px;font-size:13px"/>
+        <button type="button" class="btn btn-sm" onclick="applyDefaultInterval()">Apply all</button>
+      </div>
+    </div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Minutes allowed per hole. Used to calculate each group's schedule.</p>
+    <div class="interval-grid" id="interval-grid"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ PLAYER ═══════════════ -->
+<div id="sec-player" class="sec">
+  <div style="max-width:520px;margin:0 auto">
+    <div class="clock-bar">
+      <div>
+        <div style="font-size:12px;color:rgba(255,255,255,.7);margin-bottom:2px">Current time</div>
+        <div class="clock-time" id="clock">--:--</div>
+      </div>
+      <div class="clock-info">
+        <div class="clock-event" id="clock-event"></div>
+        <div class="clock-date" id="clock-date"></div>
+      </div>
+    </div>
+    <div class="search-card">
+      <h2>⛳ Find your tee time</h2>
+      <p>Search your name or select your tee time</p>
+      <div class="tab-row">
+        <button type="button" class="stab active" id="stab-name" onclick="setSearchTab('name')">By name</button>
+        <button type="button" class="stab" id="stab-tee" onclick="setSearchTab('tee')">By tee time</button>
+      </div>
+      <div id="search-name-panel">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input id="player-search" placeholder="Type your name…" oninput="doPlayerSearch()"/>
+        </div>
+        <div id="name-suggestions" style="margin-top:-6px;margin-bottom:8px"></div>
+      </div>
+      <div id="search-tee-panel" style="display:none">
+        <div class="row2" style="margin-top:0">
+          <div><label>Tee time</label>
+            <select id="tee-select" onchange="populateHoleSelect()">
+              <option value="">— Select —</option>
+            </select>
+          </div>
+          <div><label>Starting hole</label>
+            <select id="hole-select" onchange="showTeeGroup()">
+              <option value="">— Select —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="player-result"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ SHARE ═══════════════ -->
+<div id="sec-share" class="sec">
+  <div class="card">
+    <div class="card-hdr"><span class="card-title">QR code &amp; share link</span></div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Players scan this QR code to find their tee time. No admin access is shown.</p>
+    <label>Event to share</label>
+    <select id="share-event-select" onchange="updateShareQR()" style="margin-bottom:12px"></select>
+    <div id="qr-empty" class="empty" style="padding:1.5rem">Select an event with groups to generate QR</div>
+    <div id="qr-section" style="display:none">
+      <div class="qr-wrap"><div id="qr-canvas"></div></div>
+      <div style="background:var(--bg2);border-radius:var(--r);padding:10px;font-size:11px;color:var(--text2);word-break:break-all;margin-bottom:12px" id="share-url-display"></div>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="btn btn-primary" style="flex:1" onclick="copyShareUrl()">📋 Copy link</button>
+        <button type="button" class="btn" style="flex:1" onclick="printQRPoster()">🖨 Print poster</button>
+      </div>
+      <div id="copy-msg" style="text-align:center;font-size:12px;color:var(--green);margin-top:6px;min-height:16px"></div>
+    </div>
+  </div>
+  <!-- Print poster (hidden until print) -->
+  <div class="qr-poster" id="qr-poster">
+    <div style="font-size:22px;font-weight:700;margin-bottom:4px" id="poster-title"></div>
+    <div style="font-size:15px;color:#666;margin-bottom:1.5rem" id="poster-sub"></div>
+    <div id="poster-qr" style="display:flex;justify-content:center;margin-bottom:1rem"></div>
+    <div style="font-size:16px;color:#555">Scan to find your tee time</div>
+  </div>
+</div>
+
+<!-- ═══════════════ PRINT ═══════════════ -->
+<div id="sec-print" class="sec">
+  <div class="card print-hide">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:6px">
+        <button type="button" class="btn btn-sm active-filter" id="pf-all" onclick="setPrintFilter('all',this)">All</button>
+        <button type="button" class="btn btn-sm" id="pf-18" onclick="setPrintFilter('18',this)">18 hole</button>
+        <button type="button" class="btn btn-sm" id="pf-9" onclick="setPrintFilter('9',this)">9 hole</button>
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨 Print</button>
+    </div>
+  </div>
+  <div id="print-content"></div>
+</div>
+
+<!-- ═══════════════ EDIT GROUP MODAL ═══════════════ -->
+<div class="overlay" id="edit-overlay">
+  <div class="modal">
+    <div class="card-hdr">
+      <span class="card-title">Edit group</span>
+      <button type="button" class="btn btn-sm btn-icon" onclick="closeModal()">✕</button>
+    </div>
+    <input type="hidden" id="edit-id"/>
+    <div class="row2">
+      <div><label>Group name</label><input id="edit-name"/></div>
+      <div><label>Tee time</label><input type="time" id="edit-time"/></div>
+    </div>
+    <div class="row3" style="margin-top:0">
+      <div><label>Starting hole</label>
+        <select id="edit-hole">
+          <option value="1">Hole 1</option><option value="6">Hole 6</option>
+          <option value="10">Hole 10</option><option value="12">Hole 12</option>
+        </select>
+      </div>
+      <div><label>Holes to play</label>
+        <select id="edit-holes"><option value="18">18</option><option value="9">9</option></select>
+      </div>
+      <div><label>Field</label><input id="edit-field"/></div>
+    </div>
+    <div><label>Players (comma-separated)</label><input id="edit-players"/></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button type="button" class="btn btn-primary" style="flex:1" onclick="saveEdit()">Save</button>
+      <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /shell -->
+<script>
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+const DB_KEY = 'golfpop_v1';
+let db = { events: [], activeId: null, intervals: Array(18).fill(13) };
+let neid = 1, ngid = 1;
+let printFilter = 'all', searchTab = 'name';
+
+function persist() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e){} }
+function load() {
+  try {
+    const s = localStorage.getItem(DB_KEY);
+    if (s) {
+      db = JSON.parse(s);
+      if (!db.intervals) db.intervals = Array(18).fill(13);
+      const evs = db.events || [];
+      neid = evs.length ? Math.max(...evs.map(e=>e.id))+1 : 1;
+      const gs = evs.flatMap(e=>e.groups||[]);
+      ngid = gs.length ? Math.max(...gs.map(g=>g.id))+1 : 1;
+    }
+  } catch(e){}
 }
 
-/* ================= RENDER: PLAYER ================= */
-function setMyGroup(v){
-  if(v===""){ S.myGroup=null; save(); renderPlayer(); return; }
-  const idx=+v, g=S.groups[idx];
-  if(S.role==='player' && !S.settings.teamsEvent && S.myGroup==null){
-    if(!confirm(`Lock this phone to: ${g.players.join(', ')||g.name}?\n\nIndividual event — you won't be able to switch groups yourself afterwards (an official can).`)){ renderPlayer(); return; }
-  }
-  S.myGroup=idx; save(); renderPlayer();
+function activeEvent() { return db.events.find(e=>e.id===db.activeId)||null; }
+
+// ═══════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════
+function goTab(id, btn) {
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (id==='draw') { syncDrawSection(); renderGroups(); }
+  if (id==='field') renderField();
+  if (id==='intervals') renderIntervalGrid();
+  if (id==='player') { syncPlayerSection(); }
+  if (id==='share') renderShare();
+  if (id==='print') renderPrint();
 }
-function groupLabel(g,i){ return `${i+1}. ${esc(g.players.join(', '))||esc(g.name)} — ${hm(toMin(g.start))}, tee ${g.startHole||1}`; }
-/* Type-ahead: find your group by typing your name */
-function playerSearch(q){
-  const box=$('pSugg'); if(!box) return;
-  q=q.trim().toLowerCase();
-  if(q.length<2){ box.innerHTML=""; return; }
-  const hits=[];
-  S.groups.forEach((g,i)=>g.players.forEach(p=>{ if(p.toLowerCase().includes(q)) hits.push({p,i,g}); }));
-  box.innerHTML = hits.length
-    ? hits.slice(0,6).map(h=>`<button class="subtle" style="width:100%;text-align:left;margin-top:6px" onclick="setMyGroup('${h.i}')">
-        <b>${esc(h.p)}</b> — ${hm(toMin(h.g.start))}, tee ${h.g.startHole||1}${h.g.players.length>1?` · with ${esc(h.g.players.filter(x=>x!==h.p).join(', '))}`:""}</button>`).join("")
-    : `<p class="muted small" style="margin-top:6px">No player found for "${esc(q)}" — try the list below.</p>`;
-}
-function renderPlayer(){
-  /* Individual events lock a player phone to its chosen group; officials and
-     teams events keep the selector. */
-  const locked = S.role==='player' && !S.settings.teamsEvent && S.myGroup!=null && S.groups[S.myGroup];
-  $('myGroupCard').innerHTML = locked
-    ? `<div><div class="row" style="align-items:center;margin-bottom:10px"><span class="muted small">Current time</span><b class="num" id="pClock" style="flex:0 0 auto;font-size:1.3rem">${hm(nowMin())}</b></div>
-       <span class="pill" style="background:var(--ink);color:#fff">Locked</span>
-       <div style="margin-top:8px;font-weight:700">${groupLabel(S.groups[S.myGroup],S.myGroup)}</div>
-       <p class="muted small" style="margin-top:6px">Individual event — this phone stays with this group. Wrong group? Use Official sign-in below.</p></div>`
-    : `<div class="row" style="align-items:center;margin-bottom:10px">
-         <span class="muted small">Current time</span>
-         <b class="num" id="pClock" style="flex:0 0 auto;font-size:1.3rem">${hm(nowMin())}</b>
-       </div>
-       <label class="f"><span>Find your name</span><input id="pSearch" placeholder="Type your name…" oninput="playerSearch(this.value)"></label>
-       <div id="pSugg"></div>
-       <label class="f" style="margin-top:12px"><span>Or choose your group</span>
-       <select id="myGroup" onchange="setMyGroup(this.value)">
-         <option value="">— choose your group —</option>
-         ${S.groups.map((g,i)=>`<option value="${i}" ${S.myGroup===i?'selected':''}>${groupLabel(g,i)}</option>`).join("")}
-       </select></label>`;
-  // Player phones need the event without touching setup: load the official's export here
-  $('playerEvent').innerHTML = S.role==='player' ? `
-    <div class="card small">
-      <b>${S.groups.length? esc(S.settings.name||"Event loaded")+" — "+S.groups.length+" groups" : "No event on this phone yet"}</b>
-      <p class="muted" style="margin:6px 0 10px">${S.groups.length? "Loaded by the official. To refresh it, load their latest event file." : "Ask the official to share the event file (More → Export on their phone), then load it here."}</p>
-      <button class="ghost" onclick="document.getElementById('importBox').click()">Load event file</button>
-    </div>` : "";
-  const p=$('playerPanel');
-  if(S.myGroup==null||!S.groups[S.myGroup]){ p.innerHTML=`<div class="card muted small">Pick your group above. Then tap the button each time your group holes out — the app tells you where you stand.</div>`; return; }
-  const gi=S.myGroup, g=S.groups[gi], st=statusOf(gi), n=st.n, gh=gHoles(g);
-  const start=toMin(g.start);
-  const now=nowMin();
-  const dueOf=k=>start+cumParG(g,k+1);        // time-par finish time for the k-th hole played
-  /* Which hole SHOULD they be on right now, judged purely by the clock?
-     The first unrecorded-or-later hole whose due time hasn't passed yet. */
-  function schedHole(){
-    let k=Math.max(n,0);
-    while(k<gh-1 && dueOf(k)<now) k++;
-    return {k, due:dueOf(k), pastEnd: dueOf(gh-1)<now};
+
+// ═══════════════════════════════════════════════
+// EVENTS
+// ═══════════════════════════════════════════════
+function showNewEventForm() { document.getElementById('new-event-form').style.display='block'; document.getElementById('ev-name').focus(); }
+function hideNewEventForm() { document.getElementById('new-event-form').style.display='none'; }
+
+function newEvent() {
+  try {
+    const nameEl = document.getElementById('ev-name');
+    if (!nameEl) { alert('Form error: name field not found'); return; }
+    const name = nameEl.value.trim();
+    if (!name) { nameEl.style.border='1.5px solid red'; nameEl.focus(); return; }
+    nameEl.style.border='';
+    const ev = {
+      id: neid++,
+      name: name,
+      date: document.getElementById('ev-date').value,
+      course: document.getElementById('ev-course').value.trim(),
+      comp: '',
+      groups: []
+    };
+    db.events.push(ev);
+    db.activeId = ev.id;
+    document.getElementById('ev-name').value = '';
+    document.getElementById('ev-date').value = '';
+    document.getElementById('ev-course').value = '';
+    hideNewEventForm();
+    persist();
+    renderEventList();
+    updateHeader();
+  } catch(e) {
+    alert('Error creating event: ' + e.message);
+    console.error(e);
   }
-  let detail="", target="";
-  if(st.code==='pending'){
-    if(start!=null && now>start+1){
-      const s=schedHole();
-      detail = s.pastEnd
-        ? `No times recorded — by time par your round should already be finished.`
-        : `No times recorded yet. By time par you should be finishing hole <b class="num">${holeSeq(g,s.k)}</b> by <b class="num">${hm(s.due)}</b>.`;
-      target=`Tap "We holed out" each time you finish a hole to see how your round is really tracking.`;
-    }else{
-      detail=`Tee time ${hm(start)} on hole ${g.startHole||1} (${gh} holes). Tap below as you hole out on ${holeSeq(g,0)}.`;
-    }
-  }else if(st.code==='done'){
-    const total=g.fin[gh-1]-start;
-    detail=`${gh} holes in ${Math.floor(total/60)}h ${Math.round(total%60)}m — ${signed(st.vsPar)} min v time par.`;
-  }else{
-    const behind = st.vsPar;
-    detail = behind>0
-      ? `You are <b class="num">${Math.round(behind)} min behind</b> time par thru ${n}.`
-      : `You are <b class="num">${Math.round(-behind)} min ${behind===0?'on':'ahead of'}</b> time par thru ${n}.`;
-    if(st.gapEx!=null){
-      detail += st.gapEx>0
-        ? `<br>Gap to the group ahead is <b class="num">${Math.round(st.gapEx)} min more</b> than your starting interval.`
-        : `<br>You're holding your starting interval to the group ahead.`;
-    }
-    if(n<gh){
-      const due=dueOf(n);
-      if(now>due+1){
-        const s=schedHole();
-        target = s.pastEnd
-          ? `By time par your round should already be finished — tap through your remaining holes as you complete them.`
-          : `Nothing recorded since hole ${holeSeq(g,n-1)}. By time par you should be finishing hole <b class="num">${holeSeq(g,s.k)}</b> by <b class="num">${hm(s.due)}</b> — tap "We holed out" each hole to see exactly where you stand.`;
-      }else{
-        target=`Hole out on ${holeSeq(g,n)} by <b class="num">${hm(due)}</b> to be on time par.`;
+}
+
+function selectEvent(id) {
+  db.activeId = id;
+  persist();
+  renderEventList();
+  updateHeader();
+}
+
+function deleteEvent(id) {
+  db.events = db.events.filter(e=>e.id!==id);
+  if (db.activeId===id) db.activeId = db.events[0]?.id||null;
+  persist();
+  renderEventList();
+  updateHeader();
+}
+
+function renderEventList() {
+  const el = document.getElementById('event-list');
+  if (!db.events.length) { el.innerHTML='<div class="empty">No events yet. Create one to get started.</div>'; return; }
+  el.innerHTML = db.events.map(ev=>`
+    <div class="group-row" onclick="selectEvent(${ev.id})">
+      <div style="flex:1">
+        <div style="font-weight:500;font-size:14px">${ev.name}${db.activeId===ev.id?' <span style="font-size:11px;color:var(--blue);margin-left:4px">● active</span>':''}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${[ev.course,ev.comp,ev.date].filter(Boolean).join(' · ')||'No details'} · ${ev.groups.length} groups</div>
+      </div>
+      <button type="button" class="btn btn-sm" onclick="event.stopPropagation();selectEvent(${ev.id});goTab('draw',document.querySelectorAll('.tab')[1])">Edit draw</button>
+      <button type="button" class="btn btn-sm btn-danger btn-icon" onclick="event.stopPropagation();deleteEvent(${ev.id})">🗑</button>
+    </div>`).join('');
+}
+
+function updateHeader() {
+  const ev = activeEvent();
+  document.getElementById('hdr-title').textContent = ev ? ev.name : 'Golf Pace of Play';
+  document.getElementById('hdr-sub').textContent = ev ? [ev.course,ev.comp,ev.date].filter(Boolean).join(' · ')||'Bay of Plenty Golf' : 'Bay of Plenty Golf';
+  document.getElementById('hdr-right').textContent = ev ? ev.groups.length+' groups' : '';
+}
+
+// ═══════════════════════════════════════════════
+// DRAW SECTION
+// ═══════════════════════════════════════════════
+function syncDrawSection() {
+  const ev = activeEvent();
+  document.getElementById('no-event-msg').style.display = ev ? 'none' : 'block';
+  document.getElementById('draw-content').style.display = ev ? 'block' : 'none';
+}
+
+// ─── ADD GROUP ───────────────────────────────
+function showAddGroup() { document.getElementById('add-group-form').style.display='block'; document.getElementById('ag-name').focus(); }
+function hideAddGroup() { document.getElementById('add-group-form').style.display='none'; }
+
+function addGroup() {
+  const ev = activeEvent(); if (!ev) return;
+  const time = document.getElementById('ag-time').value;
+  if (!time) return;
+  const name = document.getElementById('ag-name').value.trim() || `Group ${ngid}`;
+  const players = document.getElementById('ag-players').value.split(',').map(p=>p.trim()).filter(Boolean);
+  ev.groups.push({
+    id: ngid++,
+    name,
+    teeTime: time,
+    startHole: parseInt(document.getElementById('ag-hole').value),
+    holesCount: parseInt(document.getElementById('ag-holes').value),
+    field: document.getElementById('ag-field').value.trim(),
+    players,
+    order: ev.groups.length
+  });
+  ev.groups.sort((a,b)=>a.teeTime.localeCompare(b.teeTime));
+  ['ag-name','ag-players','ag-field'].forEach(id=>document.getElementById(id).value='');
+  hideAddGroup();
+  persist();
+  renderGroups();
+  updateHeader();
+}
+
+function clearGroups() {
+  const ev = activeEvent(); if (!ev) return;
+  ev.groups = [];
+  persist(); renderGroups(); updateHeader();
+}
+
+// ─── RENDER GROUPS ───────────────────────────
+function renderGroups() {
+  const ev = activeEvent();
+  const list = document.getElementById('group-list');
+  if (!ev) { list.innerHTML=''; return; }
+  const q = (document.getElementById('group-search').value||'').toLowerCase();
+  const f = document.getElementById('group-filter').value;
+  let groups = ev.groups;
+  if (f!=='all') groups = groups.filter(g=>String(g.holesCount)===f);
+  if (q) groups = groups.filter(g=>g.name.toLowerCase().includes(q)||g.players.some(p=>p.toLowerCase().includes(q))||g.teeTime.includes(q));
+  if (!groups.length) { list.innerHTML='<div class="empty" style="padding:1.5rem">No groups match</div>'; return; }
+  list.innerHTML = groups.map(g=>`
+    <div class="group-row" draggable="true" data-id="${g.id}"
+      ondragstart="dragStart(event,${g.id})" ondragover="dragOver(event)" ondrop="dragDrop(event,${g.id})" ondragleave="dragLeave(event)">
+      <span class="drag-handle" title="Drag to reorder">⠿</span>
+      <div style="text-align:center">
+        <div class="group-time">${g.teeTime}</div>
+        <div class="group-hole">Tee ${g.startHole}</div>
+      </div>
+      <div class="group-body">
+        <div class="group-name">
+          ${g.name}
+          <span class="badge badge-${g.holesCount}">${g.holesCount}H</span>
+          ${g.field?`<span style="font-size:11px;color:var(--text2)">${g.field}</span>`:''}
+        </div>
+        <div class="group-players">${g.players.join(' · ')||'No players'}</div>
+      </div>
+      <div class="group-actions">
+        <button type="button" class="btn btn-sm btn-icon" onclick="openEdit(${g.id})">✏️</button>
+        <button type="button" class="btn btn-sm btn-icon btn-danger" onclick="deleteGroup(${g.id})">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function deleteGroup(id) {
+  const ev = activeEvent(); if (!ev) return;
+  ev.groups = ev.groups.filter(g=>g.id!==id);
+  persist(); renderGroups(); updateHeader();
+}
+
+// ─── DRAG & DROP REORDER ─────────────────────
+let dragId = null;
+function dragStart(e, id) { dragId=id; e.currentTarget.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; }
+function dragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function dragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function dragDrop(e, targetId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const ev = activeEvent(); if (!ev||dragId===targetId) return;
+  const from = ev.groups.findIndex(g=>g.id===dragId);
+  const to = ev.groups.findIndex(g=>g.id===targetId);
+  if (from<0||to<0) return;
+  const [item] = ev.groups.splice(from,1);
+  ev.groups.splice(to,0,item);
+  dragId=null;
+  persist(); renderGroups();
+}
+
+// ─── EDIT MODAL ──────────────────────────────
+function openEdit(id) {
+  const ev = activeEvent(); if (!ev) return;
+  const g = ev.groups.find(g=>g.id===id); if (!g) return;
+  document.getElementById('edit-id').value = id;
+  document.getElementById('edit-name').value = g.name;
+  document.getElementById('edit-time').value = g.teeTime;
+  document.getElementById('edit-hole').value = g.startHole;
+  document.getElementById('edit-holes').value = g.holesCount;
+  document.getElementById('edit-field').value = g.field||'';
+  document.getElementById('edit-players').value = g.players.join(', ');
+  document.getElementById('edit-overlay').classList.add('open');
+}
+function closeModal() { document.getElementById('edit-overlay').classList.remove('open'); }
+function saveEdit() {
+  const ev = activeEvent(); if (!ev) return;
+  const id = parseInt(document.getElementById('edit-id').value);
+  const g = ev.groups.find(g=>g.id===id); if (!g) return;
+  g.name = document.getElementById('edit-name').value.trim()||g.name;
+  g.teeTime = document.getElementById('edit-time').value;
+  g.startHole = parseInt(document.getElementById('edit-hole').value);
+  g.holesCount = parseInt(document.getElementById('edit-holes').value);
+  g.field = document.getElementById('edit-field').value.trim();
+  g.players = document.getElementById('edit-players').value.split(',').map(p=>p.trim()).filter(Boolean);
+  persist(); renderGroups(); closeModal();
+}
+
+// ═══════════════════════════════════════════════
+// SHOTGUN DRAW SUPPORT
+// ═══════════════════════════════════════════════
+let pendingShotgunText = null;
+
+function isShotgunDraw(text) {
+  // Must have "Hole N [optional (2nd Group)] TeamName" pattern
+  const hasShotgunPattern = /Hole\s+\d+\s*(?:\(2nd\s+Group\))?\s+[A-Za-z]/i.test(text);
+  if (!hasShotgunPattern) return false;
+  // A timed (non-shotgun) draw has times directly before player names like "10:00AM Mohi,"
+  // Shotgun draws only have times in headers like "Start: 8:15am" or "Finish: 12pm"
+  const hasTeeTimes = /\d{1,2}:\d{2}\s*(?:AM|PM)\s+[A-Z][a-z]+[,\s]/i.test(text);
+  if (hasTeeTimes) return false;
+  // Extra check: must have at least 3 "Hole N" entries to be a real shotgun draw
+  const holeCount = (text.match(/Hole\s+\d+/gi)||[]).length;
+  return holeCount >= 3;
+}
+
+function showShotgunSettings(text) {
+  pendingShotgunText = text;
+  document.getElementById('shotgun-settings').style.display = 'block';
+  const has2ndWave = /2nd Group/i.test(text);
+  document.getElementById('wave2-time-row').style.display = has2ndWave ? 'block' : 'none';
+  document.getElementById('wave1-label').textContent = has2ndWave ? '1st wave tee time' : 'Tee time';
+  if (has2ndWave) updateWave2Suggestion();
+  document.getElementById('shotgun-start').removeEventListener('input', updateWave2Suggestion);
+  document.getElementById('shotgun-start').addEventListener('input', updateWave2Suggestion);
+  document.getElementById('shotgun-holes').removeEventListener('input', updateWave2Suggestion);
+  document.getElementById('shotgun-holes').addEventListener('input', updateWave2Suggestion);
+}
+
+function updateWave2Suggestion() {
+  const has2ndWave = pendingShotgunText && /2nd Group/i.test(pendingShotgunText);
+  if (!has2ndWave) return;
+  const start = document.getElementById('shotgun-start').value;
+  const holes = parseInt(document.getElementById('shotgun-holes').value);
+  const interval = db.intervals[0] || 13;
+  if (!start) return;
+  const [h,m] = start.split(':').map(Number);
+  const w2mins = h*60+m+holes*interval;
+  const w2 = String(Math.floor(w2mins/60)%24).padStart(2,'0')+':'+String(w2mins%60).padStart(2,'0');
+  // Only auto-fill if user hasn't manually changed it yet
+  const w2Input = document.getElementById('shotgun-start2');
+  if (!w2Input.dataset.touched) w2Input.value = w2;
+}
+
+function cancelShotgunImport() {
+  pendingShotgunText = null;
+  document.getElementById('shotgun-settings').style.display = 'none';
+  setStatus('amber', 'Import cancelled');
+}
+
+function confirmShotgunImport() {
+  const ev = activeEvent(); if (!ev) return;
+  const startTime = document.getElementById('shotgun-start').value || '08:45';
+  const holes = parseInt(document.getElementById('shotgun-holes').value) || 9;
+  const wave2Time = document.getElementById('shotgun-start2').value || null;
+  const groups = parseShotgunDraw(pendingShotgunText, startTime, holes, wave2Time);
+  document.getElementById('shotgun-settings').style.display = 'none';
+  pendingShotgunText = null;
+  document.getElementById('shotgun-start2').dataset.touched = '';
+  finishImport(ev, groups);
+  persist();
+}
+
+function parseShotgunDraw(text, startTime, holes, wave2Time) {
+  const groups = [];
+  const wave2Start = wave2Time || startTime;
+
+  const parts = text.split(/(?=Hole\s+\d+)/i).filter(p=>p.trim());
+  for (const part of parts) {
+    const hm = part.match(/^Hole\s+(\d+)\s*(\(2nd\s+Group\))?/i);
+    if (!hm) continue;
+    // Skip header rows that start with "STARTING", "TEAMS" etc
+    const afterHole = part.replace(/^Hole\s+\d+\s*(\(2nd\s+Group\))?\s*/i,'').trim();
+    if (/^STARTING|^TEAMS|^Players/i.test(afterHole)) continue;
+    const holeNum = parseInt(hm[1]);
+    const isWave2 = !!hm[2];
+    const rest = part.replace(/^Hole\s+\d+\s*(\(2nd\s+Group\))?\s*/i,'').trim();
+    const pipeIdx = rest.indexOf('|');
+    const mainPart = pipeIdx>=0 ? rest.substring(0,pipeIdx).trim() : rest.trim();
+
+    let teamName='', playersStr='';
+    if (mainPart==='TBC') {
+      teamName='TBC';
+    } else {
+      const commaIdx = mainPart.indexOf(',');
+      if (commaIdx>=0) {
+        const beforeComma = mainPart.substring(0,commaIdx);
+        const lastSpace = beforeComma.lastIndexOf(' ');
+        if (lastSpace>=0) {
+          teamName = beforeComma.substring(0,lastSpace).trim();
+          playersStr = beforeComma.substring(lastSpace+1)+mainPart.substring(commaIdx);
+        } else { teamName=beforeComma; }
+      } else {
+        const words = mainPart.split(' ');
+        teamName = words.slice(0,-1).join(' ');
+        playersStr = words[words.length-1];
       }
     }
+    const players = playersStr ? playersStr.split(',').map(p=>p.trim()).filter(p=>p&&p!=='TBC') : [];
+    groups.push({
+      id: ngid++,
+      name: teamName||`Group ${groups.length+1}`,
+      teeTime: isWave2 ? wave2Start : startTime,
+      startHole: holeNum,
+      holesCount: holes,
+      field: isWave2 ? 'Wave 2' : 'Wave 1',
+      players,
+      order: groups.length
+    });
   }
-  const hist=scheduleGrid(gi);
-  p.innerHTML=`
-    <div class="status-hero st-${st.code}">
-      <div class="word">${statusWord(st.code)}</div>
-      <div class="detail">${detail}</div>
-      ${target?`<div class="target">${target}</div>`:""}
-    </div>
-    ${n<gh?`<button class="big" onclick="recordFinish(${gi})">We holed out on ${holeSeq(g,n)}</button>`:""}
-    ${n<gh?`<p class="small" style="text-align:center;margin-top:8px"><a href="#" onclick="recordAtHole(${gi});return false" style="color:var(--ink-soft)">Just finished a different hole? Record it here</a></p>`:""}
-    ${n>0?`<button class="subtle" style="width:100%;margin-top:8px" onclick="undoFinish(${gi})">Undo hole ${holeSeq(g,n-1)} (tapped by mistake?)</button>`:""}
-    ${hist}`;
+  return groups.sort((a,b)=>a.startHole-b.startHole||a.teeTime.localeCompare(b.teeTime));
 }
 
-/* ================= DRAW IMPORT ================= */
-function drawTab(t){
-  ['paste','file','manual'].forEach(x=>{
-    $('draw-'+x).style.display = x===t?'block':'none';
-    $('dt-'+x).classList.toggle('on',x===t);
-  });
+// ═══════════════════════════════════════════════
+// INTERCLUB FOURSOMES (Tee #1 / Tee #2 parallel matches)
+// ═══════════════════════════════════════════════
+function isInterclubDraw(text) {
+  // Looks for "TIME  Club  N&N  v  Club  N&N" pattern (tab or multi-space separated)
+  return /\d{1,2}:\d{2}[\t\s]+[A-Za-z][A-Za-z\s]*?[\t\s]+\d+&\d+[\t\s]+v[\t\s]+[A-Za-z]/i.test(text);
 }
-/* Pull start hole ("Tee 10", "10th tee", "Start hole 10") and round length
-   ("9 holes", "18 Holes", "Futures 18", "F9") out of a draw line. */
-function scanMeta(cur,line){
-  let m=line.match(/\bfutures?\s*(9|18|27|36)\b/i);
-  if(m){ cur.holes=+m[1]; line=line.replace(m[0]," "); }
-  m=line.match(/\b(9|18|27|36)\s*holes?\b/i);
-  if(m){ cur.holes=+m[1]; line=line.replace(m[0]," "); }
-  m=line.match(/\bF(9|18)\b/);
-  if(m){ cur.holes=+m[1]; line=line.replace(m[0]," "); }
-  m=line.match(/\b(\d{1,2})(?:st|nd|rd|th)\s*(?:tee|hole)\b/i);
-  if(m){ cur.startHole=+m[1]; line=line.replace(m[0]," "); }
-  m=line.match(/\b(?:tee|start(?:ing)?(?:\s*hole)?|hole)\s*#?\s*(\d{1,2})\b/i);
-  if(m){ cur.startHole=+m[1]; line=line.replace(m[0]," "); }
-  return line;
-}
-const TIME_RE=/\b(\d{1,2})[:.](\d{2})\s*(am|pm)?\b/i;
-const NOISE=/^(tee|hole|holes|time|start|draw|round|group|match|players?|name|club|hcp|handicap|index|div(ision)?|grade|course|page|futures?|key|code|\d+(\.\d+)?)$/i;
-function cleanName(s){
-  s=s.replace(/\(.*?\)/g,"").replace(/\b\d+(\.\d+)?\b/g,"").replace(/[|;#*]/g," ")
-     .replace(/(^|\s)[-–—:]+(?=\s|$)/g," ").replace(/\s+/g," ").trim();
-  if(!s || s.length<2 || NOISE.test(s)) return null;
-  if(!/[a-zA-ZÀ-ž]/.test(s)) return null;
-  return s;
-}
-/* Names are always shown First Last. Flips "KENDALL Sam" -> "Sam Kendall";
-   "Kendall, Sam" is handled by the pairing logic below. */
-function flipName(s){
-  const m=s.match(/^([A-ZÀ-Ž'’-]{2,})\s+([A-Za-zÀ-ž][\w'’.-]*(?:\s+[A-Za-zÀ-ž][\w'’.-]*)*)$/);
-  if(m && m[1]===m[1].toUpperCase() && /[a-zà-ž]/.test(m[2])){
-    const sur=m[1].split("-").map(p=>p.charAt(0)+p.slice(1).toLowerCase()).join("-");
-    return m[2].trim()+" "+sur;
-  }
-  return s;
-}
-/* A comma list where every entry is a single word is read as surname,firstname
-   pairs: "Kendall, Sam, Smith, John" -> "Sam Kendall", "John Smith".
-   Anything with multi-word entries is treated as a plain list of names. */
-function pairOrList(parts){
-  const cleaned=parts.map(cleanName).filter(Boolean);
-  if(cleaned.length>=2 && cleaned.length%2===0 && cleaned.every(p=>!/\s/.test(p))){
-    const out=[]; for(let i=0;i<cleaned.length;i+=2) out.push(cleaned[i+1]+" "+cleaned[i]);
-    return out;
-  }
-  return cleaned.map(flipName);
-}
-/* Split a run of text into player names: strong separators (tabs, big gaps,
-   slashes, "and") divide players; commas inside a chunk go through pairOrList. */
-function splitPlayers(text){
-  const out=[];
-  String(text).split(/\t|\s{2,}|·|\/|&| and | v /i).forEach(chunk=>{
-    chunk=chunk.trim(); if(!chunk) return;
-    pairOrList(chunk.split(",")).forEach(n=>out.push(n));
-  });
-  return out;
-}
-/* Heuristic parser: any line containing a time starts a group; comma/tab-separated
-   tokens on that line and name-looking lines beneath it become the players. */
-function parseText(txt){
-  const lines=txt.split(/\r?\n/);
-  const groups=[]; let cur=null;
-  for(let line of lines){
-    line=line.trim(); if(!line) continue;
-    const tm=line.match(TIME_RE);
-    if(tm){
-      if(cur&&cur.players.length) groups.push(cur);
-      let h=+tm[1], m=tm[2];
-      if(tm[3]){ const ap=tm[3].toLowerCase(); if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0; }
-      cur={ start:`${h}:${m}`, startHole:null, holes:null, players:[] };
-      line=line.replace(TIME_RE,"");
+
+function parseInterclubDraw(text) {
+  const groups = [];
+  const lines = text.split(/\r?\n/).filter(l => l.trim() && !/^Tee\s*#/i.test(l.trim()));
+  // Match: TIME  TeamA  N&N  v  TeamB  N&N  (separated by tabs or 2+ spaces)
+  const rx = /(\d{1,2}:\d{2})[\t ]{1,}([A-Za-z][A-Za-z'\.\s]*?)[\t ]{2,}(\d+&\d+)[\t ]+v[\t ]+([A-Za-z][A-Za-z'\.\s]*?)[\t ]{2,}(\d+&\d+)/g;
+  let gnum = 1;
+  lines.forEach(line => {
+    let m;
+    rx.lastIndex = 0;
+    while ((m = rx.exec(line)) !== null) {
+      const time = m[1];
+      const teamA = m[2].trim();
+      const numsA = m[3];
+      const teamB = m[4].trim();
+      const numsB = m[5];
+      groups.push({
+        id: ngid++,
+        name: `${teamA} (${numsA}) v ${teamB} (${numsB})`,
+        teeTime: time,
+        startHole: 1,
+        holesCount: 18,
+        field: 'Interclub',
+        players: [`${teamA} ${numsA}`, `${teamB} ${numsB}`],
+        order: groups.length
+      });
+      gnum++;
     }
-    if(!cur) continue;
-    line=scanMeta(cur,line);
-    splitPlayers(line).forEach(nm=>{ if(cur.players.length<5) cur.players.push(nm); });
+  });
+  return groups.sort((a,b)=>a.teeTime.localeCompare(b.teeTime));
+}
+
+// ═══════════════════════════════════════════════
+// TEE SHEET EXPORT (time / hole / field, one player per line)
+// ═══════════════════════════════════════════════
+function isTeeSheetExport(text) {
+  return /^\d{1,2}:\d{2}\t?\d+\t?\S+\s*$/m.test(text) && /Playing\s+\d+\s+Holes/i.test(text);
+}
+
+function parseTeeSheetExport(text) {
+  const groups = [];
+  const blocks = text.split(/\n\s*\n/).map(b=>b.trim()).filter(Boolean);
+  let gnum=1;
+  for (const block of blocks) {
+    const lines = block.split('\n').map(l=>l.trim()).filter(l=>l!=='');
+    if (!lines.length) continue;
+    const hdr = lines[0].match(/^(\d{1,2}:\d{2})\t?(\d+)\t?(\S+)/);
+    if (!hdr) continue;
+    const teeTime = hdr[1];
+    const startHole = parseInt(hdr[2]);
+    const field = hdr[3];
+
+    const players = [];
+    const holeCounts = [];
+    for (let i=1;i<lines.length;i++){
+      const line = lines[i];
+      if (line === '(empty)') continue;
+      if (/^[A-Za-z][\w'.\- ]*,\s*[A-Za-z]/.test(line)) {
+        const parts = line.split(',').map(s=>s.trim());
+        players.push(`${parts[1]} ${parts[0]}`);
+      } else if (line === 'Visitor') {
+        players.push('Visitor');
+      } else if (/Playing\s+(\d+)\s+Holes/i.test(line)) {
+        const hm = line.match(/Playing\s+(\d+)\s+Holes/i);
+        holeCounts.push(parseInt(hm[1]));
+      }
+      // else: metadata line (Cart Booked, Cart Exemption etc) - ignore
+    }
+    let holesCount = 18;
+    if (holeCounts.length) {
+      const counts = {};
+      holeCounts.forEach(h=>counts[h]=(counts[h]||0)+1);
+      holesCount = parseInt(Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0]);
+    }
+
+    groups.push({
+      id: ngid++,
+      name: `Group ${gnum++}`,
+      teeTime, startHole, holesCount,
+      field: field==='ALL' ? '' : field,
+      players,
+      order: groups.length
+    });
   }
-  if(cur&&cur.players.length) groups.push(cur);
+  return groups.sort((a,b)=>a.teeTime.localeCompare(b.teeTime)||a.startHole-b.startHole);
+}
+
+// ═══════════════════════════════════════════════
+// CLUB MATCHPLAY (singles with member numbers)
+// "8:00 Ray Dumble 300 1621 8 v Tom McKeown 217 1650 8"
+// ═══════════════════════════════════════════════
+function isPlayerMatchDraw(text) {
+  return /\d{1,2}:\d{2}\s+[A-Za-z][a-zA-Z'\-]*(?:\s+[A-Za-z][a-zA-Z'\-]*)+\s+\d{2,3}\s+\d{2,4}\s+\d+\s+v\s+/.test(text);
+}
+
+function parsePlayerMatchDraw(text) {
+  const groups = [];
+  const rx = /(\d{1,2}:\d{2})\s+((?:[A-Z][a-zA-Z'\-]*\s+)+?)(\d{2,3})\s+(\d{2,4})\s+(\d+)\s+v\s+(?:((?:[A-Z][a-zA-Z'\-]*\s+)+?)(\d{2,3})\s+(\d{2,4})\s+)?(\d+)/g;
+  let m, gnum=1;
+  while ((m = rx.exec(text)) !== null) {
+    const time = m[1];
+    const name1 = m[2].trim();
+    const hole1 = parseInt(m[5]);
+    const name2 = m[6] ? m[6].trim() : null;
+    const players = [name1];
+    if (name2) players.push(name2);
+    groups.push({
+      id: ngid++,
+      name: name2 ? `${name1} v ${name2}` : `Group ${gnum}`,
+      teeTime: time,
+      startHole: hole1,
+      holesCount: 18,
+      field: '',
+      players,
+      order: groups.length
+    });
+    gnum++;
+  }
+  return groups.sort((a,b)=>a.teeTime.localeCompare(b.teeTime)||a.startHole-b.startHole);
+}
+
+// ═══════════════════════════════════════════════
+// FINALS MATCHPLAY (multi-division, "Name N v N Name", "Division Tee #N" headers)
+// ═══════════════════════════════════════════════
+function isFinalsMatchplay(text) {
+  return /\d{1,2}:\d{2}\s+(?:[A-Z][a-zA-Z'\-]+\s+){1,3}\d\s+v\s+(?:[A-Z][a-zA-Z'\-]+\s+){1,3}\d/.test(text)
+    && /Tee\s*#\d+/i.test(text);
+}
+
+function parseFinalsMatchplay(text) {
+  const groups = [];
+  let currentHoles = [1];
+  let currentFields = [''];
+  const lines = text.split(/\r?\n/);
+
+  for (const line of lines) {
+    const headerRx = /([A-Za-z]+)\s+Tee\s*#(\d+)/gi;
+    const headers = [...line.matchAll(headerRx)];
+    if (headers.length) {
+      currentHoles = headers.map(h => parseInt(h[2]));
+      currentFields = headers.map(h => h[1]);
+      continue;
+    }
+    const rowRx = /(\d{1,2}:\d{2})\s+((?:[A-Z][a-zA-Z'\-]+\s+)*[A-Z][a-zA-Z'\-]+)\s+\d+\s+v\s+((?:[A-Z][a-zA-Z'\-]+\s+)*[A-Z][a-zA-Z'\-]+)\s+\d+/g;
+    let m, idx=0;
+    while ((m = rowRx.exec(line)) !== null) {
+      const teeTime = m[1];
+      const name1 = m[2].trim();
+      const name2 = m[3].trim();
+      const hole = currentHoles[idx] !== undefined ? currentHoles[idx] : (currentHoles[0]||1);
+      const field = currentFields[idx] !== undefined ? currentFields[idx] : (currentFields[0]||'');
+      groups.push({
+        id: ngid++,
+        name: `${name1} v ${name2}`,
+        teeTime, startHole: hole, holesCount: 18, field,
+        players:[name1,name2], order: groups.length
+      });
+      idx++;
+    }
+  }
+  return groups.sort((a,b)=>a.teeTime.localeCompare(b.teeTime)||a.startHole-b.startHole);
+}
+
+// ═══════════════════════════════════════════════
+// PDF IMPORT
+// ═══════════════════════════════════════════════
+async function importPDF(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const ev = activeEvent(); if (!ev) { setStatus('amber','Select an event first'); return; }
+  if (!file.type.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf')) {
+    setStatus('red','That file doesn\'t look like a PDF. On some phones, photos of a draw get saved as images — try the Screenshot/Photo option instead.');
+    e.target.value=''; return;
+  }
+  setStatus('amber','Reading PDF…');
+  try {
+    const buf = await file.arrayBuffer();
+    const lib = window['pdfjs-dist/build/pdf'];
+    if (!lib) throw new Error('PDF library failed to load — check your internet connection and try again');
+    lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdf = await lib.getDocument({data:buf}).promise;
+    // Simple left-to-right, top-to-bottom text join (works for most single-column draws)
+    let text = '';
+    // Positionally-ordered text (groups items into visual rows by Y, sorts by X within row)
+    // This handles multi-column layouts like finals draws with side-by-side divisions
+    let orderedText = '';
+    for (let i=1;i<=pdf.numPages;i++) {
+      const pg = await pdf.getPage(i);
+      const ct = await pg.getTextContent();
+      text += ct.items.map(x=>x.str).join(' ')+'\n';
+
+      const items = ct.items
+        .map(it => ({ x: it.transform[4], y: it.transform[5], str: it.str }))
+        .filter(it => it.str.trim());
+      items.sort((a,b) => b.y - a.y || a.x - b.x);
+      const rows = [];
+      let current = [];
+      let lastY = null;
+      const TOL = 3;
+      items.forEach(it => {
+        if (lastY === null || Math.abs(it.y - lastY) <= TOL) {
+          current.push(it);
+        } else {
+          rows.push(current);
+          current = [it];
+        }
+        lastY = it.y;
+      });
+      if (current.length) rows.push(current);
+      rows.forEach(row => {
+        row.sort((a,b)=>a.x-b.x);
+        orderedText += row.map(r=>r.str).join(' ') + '\n';
+      });
+    }
+    const meta = extractMeta(text);
+    if (meta.course && !ev.course) ev.course = meta.course;
+    if (meta.date && !ev.date) ev.date = meta.date;
+    if (isFinalsMatchplay(orderedText)) {
+      finishImport(ev, parseFinalsMatchplay(orderedText));
+    } else if (isPlayerMatchDraw(text)) {
+      finishImport(ev, parsePlayerMatchDraw(text));
+    } else if (isInterclubDraw(text)) {
+      finishImport(ev, parseInterclubDraw(text));
+    } else if (isShotgunDraw(text)) {
+      // Extract start time from PDF if present
+      const stm = text.match(/Start[:\s]+(\d{1,2}:\d{2}\s*(?:am|pm)?)/i);
+      if (stm) {
+        const raw = stm[1].trim();
+        const tm = raw.match(/(\d+):(\d+)\s*(am|pm)?/i);
+        if (tm) {
+          let h=parseInt(tm[1]),m=parseInt(tm[2]);
+          if(tm[3]&&/pm/i.test(tm[3])&&h!==12) h+=12;
+          if(tm[3]&&/am/i.test(tm[3])&&h===12) h=0;
+          // Show found time as suggestion but don't use it as tee time
+          document.getElementById('shotgun-start').value = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+        }
+      }
+      setStatus('amber', 'Shotgun draw detected — set your tee time below');
+      showShotgunSettings(text);
+    } else {
+      const fallback = parseBoPDraw(text);
+      if (fallback.length) {
+        finishImport(ev, fallback);
+      } else {
+        // Nothing matched - show extracted text so it can be reviewed/fixed and reported
+        document.getElementById('paste-text').value = orderedText.trim();
+        document.getElementById('paste-form').style.display = 'block';
+        setStatus('amber', "Couldn't auto-detect this draw's format. Here's the text read from the PDF — please share this with support, or edit and click Import to try matching it manually.");
+      }
+    }
+  } catch(err) { setStatus('red','PDF error: '+err.message); }
+  e.target.value='';
+}
+
+// ═══════════════════════════════════════════════
+// IMAGE / SCREENSHOT IMPORT (on-device OCR)
+// ═══════════════════════════════════════════════
+async function importImage(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const ev = activeEvent(); if (!ev) { setStatus('amber','Select an event first'); e.target.value=''; return; }
+  setStatus('amber','Reading text from image… this can take 10-20 seconds');
+  try {
+    if (!window.Tesseract) throw new Error('OCR library failed to load — check your internet connection and try again');
+    const result = await Tesseract.recognize(file, 'eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          setStatus('amber', `Reading image… ${Math.round((m.progress||0)*100)}%`);
+        }
+      }
+    });
+    const text = result.data.text;
+    if (!text || text.trim().length < 10) {
+      throw new Error('Could not read any text from this image. Try a clearer, less angled photo, or use Paste text instead.');
+    }
+    // Show the OCR'd text for review before importing - OCR isn't perfect
+    document.getElementById('paste-text').value = text;
+    document.getElementById('paste-form').style.display = 'block';
+    setStatus('green', 'Text extracted — please check it looks right below, then click Import. Fix any typos first if needed.');
+  } catch(err) {
+    setStatus('red', 'Image import failed: ' + err.message);
+  }
+  e.target.value = '';
+}
+
+// ═══════════════════════════════════════════════
+// PASTE TEXT IMPORT
+// ═══════════════════════════════════════════════
+function showPasteImport() {
+  const f = document.getElementById('paste-form');
+  f.style.display = f.style.display==='none' ? 'block' : 'none';
+}
+function importPasteText() {
+  const ev = activeEvent(); if (!ev) { setStatus('amber','Select an event first'); return; }
+  const text = document.getElementById('paste-text').value;
+  if (!text.trim()) return;
+  if (isFinalsMatchplay(text)) {
+    finishImport(ev, parseFinalsMatchplay(text));
+    document.getElementById('paste-text').value='';
+    document.getElementById('paste-form').style.display='none';
+  } else if (isPlayerMatchDraw(text)) {
+    finishImport(ev, parsePlayerMatchDraw(text));
+    document.getElementById('paste-text').value='';
+    document.getElementById('paste-form').style.display='none';
+  } else if (isTeeSheetExport(text)) {
+    finishImport(ev, parseTeeSheetExport(text));
+    document.getElementById('paste-text').value='';
+    document.getElementById('paste-form').style.display='none';
+  } else if (isInterclubDraw(text)) {
+    finishImport(ev, parseInterclubDraw(text));
+    document.getElementById('paste-text').value='';
+    document.getElementById('paste-form').style.display='none';
+  } else if (isShotgunDraw(text)) {
+    document.getElementById('paste-form').style.display='none';
+    setStatus('amber','Shotgun draw detected — set your tee time below');
+    showShotgunSettings(text);
+  } else {
+    finishImport(ev, parseBoPDraw(text));
+    document.getElementById('paste-text').value='';
+    document.getElementById('paste-form').style.display='none';
+  }
+}
+
+// ─── PARSE BoP DRAW FORMAT ───────────────────
+function parseBoPDraw(text) {
+  const groups=[]; let gnum=1;
+  const norm = text.replace(/\r/g,'');
+  const secRx = /FUTURES\s+(\d+)\s+FIELD[^|]*\|\s*(\d+)(?:ST|ND|RD|TH)\s+TEE([\s\S]*?)(?=FUTURES\s+\d+\s+FIELD|Generated|$)/gi;
+  let sm;
+  while((sm=secRx.exec(norm))!==null){
+    const holes=parseInt(sm[1]), teeHole=parseInt(sm[2]), block=sm[3];
+    const rowRx=/(\d{1,2}:\d{2})\s*(AM|PM)\s+(.+?)(?=\d{1,2}:\d{2}\s*(?:AM|PM)|$)/gi;
+    let rm;
+    while((rm=rowRx.exec(block))!==null){
+      const tt=to24h(rm[1],rm[2]);
+      if(!tt) continue;
+      const players=parseNames(rm[3].trim());
+      if(!players.length) continue;
+      groups.push({id:ngid++,name:`Group ${gnum++}`,teeTime:tt,startHole:teeHole,holesCount:holes,field:`Futures ${holes}`,players,order:groups.length});
+    }
+  }
   return groups;
 }
-/* Draws can contain several rounds. Lines like "Round 2", "Round 2 Draw -
-   Sunday" split the text into rounds; a draw with no such headers is one round. */
-function parseRounds(txt){
-  const ROUND_RE=/\bround\s*#?\s*(\d+)\b/i;
-  const lines=txt.split(/\r?\n/);
-  const segs=[]; let label=null, buf=[];
+
+function to24h(t,ap){
+  const [h,m]=t.split(':').map(Number);
+  let hh=h;
+  if(/PM/i.test(ap)&&h!==12) hh+=12;
+  if(/AM/i.test(ap)&&h===12) hh=0;
+  return `${String(hh).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+function parseNames(block){
+  const names=[];
+  const rx=/([A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ][a-zA-ZÀ-ÿ'\-]+(?:\s+[A-Z][a-zA-ZÀ-ÿ'\-]+)*),\s*([A-Z][a-zA-ZÀ-ÿ'\-\s]+?)(?=\s+[A-ZÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝ][a-zA-ZÀ-ÿ'\-]+,|\s*$)/g;
+  let m;
+  while((m=rx.exec(block))!==null) names.push(`${m[2].trim()} ${m[1].trim()}`);
+  return names;
+}
+
+function extractMeta(text){
+  const meta={course:'',date:''};
+  const lines=text.split(/\r?\n/);
   for(const line of lines){
-    const m=line.match(ROUND_RE);
-    if(m && !TIME_RE.test(line)){            // a round header, not a tee-time line
-      if(buf.length) segs.push({label,text:buf.join("\n")});
-      label="Round "+m[1]; buf=[];
-    } else buf.push(line);
+    if(/^Course:/i.test(line.trim())) meta.course=line.replace(/^Course:\s*/i,'').trim();
   }
-  segs.push({label,text:buf.join("\n")});
-  const rounds=segs.map(s=>({label:s.label,groups:parseText(s.text)})).filter(r=>r.groups.length);
-  rounds.forEach((r,i)=>{ if(!r.label) r.label="Round "+(i+1); });
-  return rounds;
+  const dm=text.match(/(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s,]+(\d{4})/i);
+  if(dm){
+    const mo={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+    meta.date=`${dm[3]}-${mo[dm[2].toLowerCase().substring(0,3)]}-${String(dm[1]).padStart(2,'0')}`;
+  }
+  return meta;
 }
-let pending=null; // [{label, groups:[{start,startHole,holes,players}]}]
-function parsePaste(){
-  const txt=$('pasteBox').value;
-  if(isShotgun(txt)){ shotgunFlow(txt); return; }
-  const r=parseRounds(txt);
-  if(!r.length){ alert("Couldn't find tee times in that text. Each group needs a time like 8:00 or 8:00 am — or use the Manual tab."); return; }
-  pending=r; renderPreview();
+
+function finishImport(ev, groups, fromAI=false){
+  if(!groups||!groups.length){ setStatus('amber','No groups found'); return; }
+  groups.forEach(g=>ev.groups.push(g));
+  ev.groups.sort((a,b)=>a.teeTime.localeCompare(b.teeTime));
+  persist(); renderGroups(); updateHeader();
+  const n18=groups.filter(g=>g.holesCount===18).length;
+  const n9=groups.filter(g=>g.holesCount===9).length;
+  setStatus('green',`${groups.length} groups imported${fromAI?' (AI)':''} — ${n18}×18 hole, ${n9}×9 hole`);
+  // Auto-switch to draw tab
+  goTab('draw',document.querySelectorAll('.tab')[1]);
 }
-function renderPreview(){
-  if(!pending){ $('drawPreview').innerHTML=""; return; }
-  const dh = CH()===9 ? 9 : 18;
-  const multi = pending.length>1;
-  const roundsHtml = pending.map((r,ri)=>`
-    <div style="margin-top:${ri?14:10}px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <b>${esc(r.label)} — ${r.groups.length} groups</b>
-        ${multi?`<button class="subtle" style="padding:6px 10px;font-size:.75rem" onclick="pending.splice(${ri},1);if(!pending.length)pending=null;renderPreview()">Remove round</button>`:""}
+
+function setStatus(colour,msg){
+  const el=document.getElementById('import-status');
+  const dots={green:'dot-green',amber:'dot-amber',red:'dot-red'};
+  el.innerHTML=`<span class="dot ${dots[colour]||'dot-amber'}"></span>${msg}`;
+}
+
+// ═══════════════════════════════════════════════
+// INTERVALS
+// ═══════════════════════════════════════════════
+function renderIntervalGrid(){
+  const grid=document.getElementById('interval-grid');
+  grid.innerHTML=db.intervals.map((v,i)=>`
+    <div class="int-cell">
+      <label>H${i+1}</label>
+      <input type="number" min="5" max="30" value="${v}" onchange="db.intervals[${i}]=parseInt(this.value)||13;persist()"/>
+    </div>`).join('');
+  document.getElementById('default-interval').value = db.intervals[0]||13;
+}
+
+function applyDefaultInterval(){
+  const v=parseInt(document.getElementById('default-interval').value)||13;
+  db.intervals=Array(18).fill(v);
+  persist(); renderIntervalGrid();
+}
+
+// ═══════════════════════════════════════════════
+// TIMING CALC
+// ═══════════════════════════════════════════════
+function calcTimes(teeTime, startHole, holesCount){
+  const [h,m]=teeTime.split(':').map(Number);
+  const si=(parseInt(startHole)||1)-1;
+  const totalHoles=db.intervals.length||18;
+  const res=[];
+  let cum=0;
+  for(let i=0;i<holesCount;i++){
+    // Wrap by total holes on course (18) so hole numbers stay correct
+    // e.g. 9 holes from hole 10: 10,11,12,13,14,15,16,17,18
+    // e.g. 9 holes from hole 3 on a 9-hole course: 3,4,5,6,7,8,9,1,2
+    const holeIdx=(si+i)%totalHoles;
+    const interval=db.intervals[holeIdx]||13;
+    const t=h*60+m+cum;
+    res.push({hole:holeIdx+1,time:fmt(t),completeBy:fmt(t+interval),completeMins:t+interval,teeMins:t});
+    cum+=interval;
+  }
+  return res;
+}
+
+function fmt(mins){
+  return String(Math.floor(mins/60)%24).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+}
+
+function nowMins(){ const n=new Date(); return n.getHours()*60+n.getMinutes(); }
+
+// ═══════════════════════════════════════════════
+// FIELD VIEW — where every group SHOULD be right now,
+// calculated purely from tee times + intervals (no recording needed)
+// ═══════════════════════════════════════════════
+function renderField(){
+  const ev=activeEvent();
+  const el=document.getElementById('field-content');
+  const nowEl=document.getElementById('field-now');
+  if(nowEl) nowEl.textContent='at '+fmt(nowMins());
+  if(!ev||!ev.groups.length){ el.innerHTML='<div class="empty">No groups in the active event</div>'; return; }
+  const now=nowMins();
+  const sorted=[...ev.groups].sort((a,b)=>a.teeTime.localeCompare(b.teeTime)||a.startHole-b.startHole);
+  el.innerHTML=sorted.map(g=>{
+    const times=calcTimes(g.teeTime,g.startHole,g.holesCount);
+    const started=now>=times[0].teeMins, finished=now>=times[times.length-1].completeMins;
+    let chip,cls;
+    if(!started){ chip='Tees off '+g.teeTime; cls='soon'; }
+    else if(finished){ chip='✓ Should be done ('+times[times.length-1].completeBy+')'; cls='done'; }
+    else {
+      const cur=times.find(h=>now>=h.teeMins&&now<h.completeMins)||times[times.length-1];
+      chip='Hole '+cur.hole+' · finish by '+cur.completeBy; cls='now';
+    }
+    return `<div class="group-row" style="cursor:default;align-items:center">
+      <div style="text-align:center"><div class="group-time">${g.teeTime}</div><div class="group-hole">Tee ${g.startHole}</div></div>
+      <div class="group-body">
+        <div class="group-name">${g.name} <span class="badge badge-${g.holesCount}">${g.holesCount}H</span>${g.field?`<span style="font-size:11px;color:var(--text2)">${g.field}</span>`:''}</div>
+        <div class="group-players">${g.players.join(' · ')||'—'}</div>
       </div>
-      <div class="drawrow drawhead"><span>Time</span><span>Tee</span><span>Holes</span><span>Players</span><span></span></div>
-      ${r.groups.map((g,gi)=>`
-      <div class="drawrow">
-        <input value="${esc(g.start)}" onchange="pending[${ri}].groups[${gi}].start=this.value">
-        <input type="number" min="1" max="${CH()}" value="${g.startHole||1}" onchange="pending[${ri}].groups[${gi}].startHole=+this.value">
-        <input type="number" min="1" max="36" value="${g.holes||dh}" onchange="pending[${ri}].groups[${gi}].holes=+this.value">
-        <input value="${esc(g.players.join(', '))}" onchange="pending[${ri}].groups[${gi}].players=splitPlayers(this.value)">
-        <button onclick="pending[${ri}].groups.splice(${gi},1);renderPreview()" title="Remove">&times;</button>
-      </div>`).join("")}
-    </div>`).join("");
-  $('drawPreview').innerHTML=`
-    <div class="card" style="border-color:var(--ink)">
-      <b>Found ${multi? pending.length+" rounds":"1 round"} — check &amp; edit, then choose</b>
-      ${roundsHtml}
-      <div class="row" style="margin-top:12px">
-        ${multi
-          ? `<button class="big" onclick="useAllRounds()">Load: ${esc(pending[0].label)} live, rest queued</button>
-             <button class="ghost" onclick="queueAllRounds()">Queue all for later</button>`
-          : `<button class="big" onclick="useLiveRound(0)">Use as live round</button>
-             <button class="ghost" onclick="queueRound(0)">Queue for later</button>`}
-        <button class="subtle" onclick="pending=null;renderPreview()">Discard</button>
+      <div class="fchip fchip-${cls}">${chip}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// ACTUAL PACE — players tap when they hole out; stored on this phone,
+// keyed by event + tee time + start hole so it survives refresh & QR links
+// ═══════════════════════════════════════════════
+const FIN_KEY='golfpop_fin_v1';
+let finStore={};
+function loadFin(){ try{ finStore=JSON.parse(localStorage.getItem(FIN_KEY)||'{}'); }catch(e){ finStore={}; } }
+function saveFin(){ try{ localStorage.setItem(FIN_KEY,JSON.stringify(finStore)); }catch(e){} }
+function finKey(g){ const ev=activeEvent(); return (ev?ev.name:'')+'|'+g.teeTime+'|'+g.startHole+'|'+g.holesCount; }
+function getFin(g){ return finStore[finKey(g)]||[]; }
+function setFinArr(g,arr){ while(arr.length&&arr[arr.length-1]==null) arr.pop(); finStore[finKey(g)]=arr; saveFin(); }
+function lastFinIdx(fin){ let n=0; for(let i=0;i<fin.length;i++) if(fin[i]!=null) n=i+1; return n; }
+loadFin();
+
+function recFin(ci){
+  const g=window._cards&&window._cards[ci]; if(!g) return;
+  const times=calcTimes(g.teeTime,g.startHole,g.holesCount);
+  const fin=getFin(g).slice(); const n=lastFinIdx(fin);
+  if(n>=times.length) return;
+  fin[n]=nowMins(); setFinArr(g,fin); refreshPlayerResult();
+}
+function recFinAt(ci){
+  const g=window._cards&&window._cards[ci]; if(!g) return;
+  const v=prompt('Which hole did you just finish? (the hole number)'); if(v===null) return;
+  const hn=parseInt(v); if(!hn){ alert('Enter the hole number, e.g. 7'); return; }
+  const times=calcTimes(g.teeTime,g.startHole,g.holesCount);
+  const fin=getFin(g).slice();
+  let k=-1;
+  for(let i=0;i<times.length;i++) if(times[i].hole===hn && fin[i]==null){ k=i; break; }
+  if(k<0){ alert('Hole '+hn+' is already recorded or isn\'t in this round.'); return; }
+  fin[k]=nowMins(); setFinArr(g,fin); refreshPlayerResult();
+}
+function undoFin(ci){
+  const g=window._cards&&window._cards[ci]; if(!g) return;
+  const fin=getFin(g).slice(); const n=lastFinIdx(fin); if(!n) return;
+  fin[n-1]=null; setFinArr(g,fin); refreshPlayerResult();
+}
+function refreshPlayerResult(){
+  if(searchTab==='name'){ const q=document.getElementById('player-search').value; if(q&&q.length>=2) showPlayerResult(q); }
+  else showTeeGroup();
+}
+
+// ═══════════════════════════════════════════════
+// PLAYER VIEW
+// ═══════════════════════════════════════════════
+function syncPlayerSection(){
+  const ev=activeEvent();
+  document.getElementById('clock-event').textContent=ev?ev.name:'';
+  document.getElementById('clock-date').textContent=ev?[ev.course,ev.date].filter(Boolean).join(' · '):'';
+  populatePlayerDropdowns();
+}
+
+function setSearchTab(tab){
+  searchTab=tab;
+  document.getElementById('search-name-panel').style.display=tab==='name'?'block':'none';
+  document.getElementById('search-tee-panel').style.display=tab==='tee'?'block':'none';
+  document.getElementById('stab-name').classList.toggle('active',tab==='name');
+  document.getElementById('stab-tee').classList.toggle('active',tab==='tee');
+  document.getElementById('player-result').innerHTML='';
+}
+
+function populatePlayerDropdowns(){
+  const ev=activeEvent(); if(!ev) return;
+  // Player search - type-ahead (no dropdown, just live search)
+  // Tee time select
+  const times=[...new Set(ev.groups.map(g=>g.teeTime))].sort();
+  const tsel=document.getElementById('tee-select');
+  tsel.innerHTML='<option value="">— Select —</option>'+times.map(t=>`<option value="${t}">${t}</option>`).join('');
+}
+
+function doPlayerSearch(){
+  const ev=activeEvent(); if(!ev) return;
+  const q=(document.getElementById('player-search').value||'').toLowerCase().trim();
+  const sugg=document.getElementById('name-suggestions');
+  if(q.length<2){ sugg.innerHTML=''; document.getElementById('player-result').innerHTML=''; return; }
+  // Find matching players
+  const matches=[];
+  ev.groups.forEach(g=>g.players.forEach(p=>{ if(p.toLowerCase().includes(q)&&!matches.includes(p)) matches.push(p); }));
+  if(matches.length===0){ sugg.innerHTML=''; showPlayerResult(q); return; }
+  sugg.innerHTML=matches.slice(0,6).map(p=>`
+    <div onclick="selectPlayer('${p.replace(/'/g,"\\'")}',this)" style="padding:8px 12px;background:var(--bg2);border-radius:var(--r);margin-bottom:4px;cursor:pointer;font-size:14px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg2)'">${p}</div>
+  `).join('');
+  // If exact match just show result
+  if(matches.length===1) showPlayerResult(matches[0]);
+}
+
+function selectPlayer(name,el){
+  document.getElementById('player-search').value=name;
+  document.getElementById('name-suggestions').innerHTML='';
+  showPlayerResult(name);
+}
+
+function showPlayerResult(q){
+  const ev=activeEvent(); if(!ev) return;
+  const ql=q.toLowerCase();
+  const matched=ev.groups.filter(g=>g.players.some(p=>p.toLowerCase().includes(ql)));
+  renderPlayerResult(matched);
+}
+
+function populateHoleSelect(){
+  const ev=activeEvent(); if(!ev) return;
+  const time=document.getElementById('tee-select').value;
+  document.getElementById('player-result').innerHTML='';
+  const hsel=document.getElementById('hole-select');
+  if(!time){ hsel.innerHTML='<option value="">— Select —</option>'; return; }
+  const holes=[...new Set(ev.groups.filter(g=>g.teeTime===time).map(g=>g.startHole))].sort((a,b)=>a-b);
+  hsel.innerHTML='<option value="">— Select —</option>'+holes.map(h=>`<option value="${h}">Hole ${h}</option>`).join('');
+  if(holes.length===1){ hsel.value=holes[0]; showTeeGroup(); }
+}
+
+function showTeeGroup(){
+  const ev=activeEvent(); if(!ev) return;
+  const time=document.getElementById('tee-select').value;
+  const hole=parseInt(document.getElementById('hole-select').value);
+  if(!time||!hole){ document.getElementById('player-result').innerHTML=''; return; }
+  renderPlayerResult(ev.groups.filter(g=>g.teeTime===time&&g.startHole===hole));
+}
+
+function renderPlayerResult(groups){
+  const res=document.getElementById('player-result');
+  window._cards=groups;
+  if(!groups.length){ res.innerHTML='<div class="empty">No match found</div>'; return; }
+  res.innerHTML=groups.map((g,ci)=>renderTeeCard(g,true,ci)).join('');
+}
+
+function renderTeeCard(g, showClock, ci){
+  const times=calcTimes(g.teeTime,g.startHole,g.holesCount);
+  const now=nowMins();
+  const fin=(showClock&&ci!=null)?getFin(g):[];
+  const nFin=lastFinIdx(fin);
+  const started=times.length&&now>=times[0].teeMins;
+  const finished=times.length&&now>=times[times.length-1].completeMins;
+  const curIdx=times.findIndex(h=>now>=h.teeMins&&now<h.completeMins);
+  const badge=g.holesCount===9?'<span class="badge badge-9">9H</span>':'<span class="badge badge-18">18H</span>';
+
+  let status='';
+  if(showClock){
+    if(started&&!finished&&curIdx>=0){
+      const cur=times[curIdx];
+      status=`<div class="status-bar status-now">⛳ Now on hole ${cur.hole} — finish by ${cur.completeBy}</div>`;
+    } else if(finished){
+      status=`<div class="status-bar status-done">✓ Round complete</div>`;
+    } else if(!started){
+      status=`<div class="status-bar status-soon">Tees off at ${g.teeTime}</div>`;
+    }
+  }
+
+  // Actual pace from the player's own taps (schedule = plan; taps = truth)
+  let pace='';
+  if(showClock && ci!=null){
+    if(nFin>0){
+      const last=fin[nFin-1], diff=Math.round(last-times[nFin-1].completeMins);
+      const ahead=diff<=0;
+      pace+=`<div class="pace-bar ${ahead?'pace-ahead':'pace-behind'}">${ahead?'✓':'⚠'} Actual pace: ${diff===0?'right on schedule':Math.abs(diff)+' min '+(ahead?'ahead of':'behind')+' schedule'} thru hole ${times[nFin-1].hole} <span style="font-weight:400">(holed out ${fmt(last)})</span></div>`;
+    }
+    if(nFin<times.length){
+      pace+=`<button type="button" class="finish-btn" onclick="recFin(${ci})">✅ We just finished hole ${times[nFin].hole}</button>
+      <div class="finish-links">
+        <a href="#" onclick="recFinAt(${ci});return false">Finished a different hole?</a>
+        ${nFin>0?`<a href="#" onclick="undoFin(${ci});return false">Undo hole ${times[nFin-1].hole}</a>`:'<span></span>'}
+      </div>`;
+    } else if(nFin>0){
+      pace+=`<div class="finish-links"><span></span><a href="#" onclick="undoFin(${ci});return false">Undo hole ${times[nFin-1].hole}</a></div>`;
+    }
+  }
+
+  const holesHtml=times.map((h,i)=>{
+    const act=fin[i]!=null?`<div class="hole-act ${fin[i]<=h.completeMins?'act-ahead':'act-behind'}">✓ ${fmt(fin[i])} (${fin[i]-h.completeMins>0?'+':''}${Math.round(fin[i]-h.completeMins)})</div>`:'';
+    const isCur=showClock&&started&&!finished&&i===curIdx;
+    const isPast=showClock&&started&&!finished&&i<curIdx;
+    const cls='hole'+(isCur?' now':isPast?' past':'');
+    if(isCur) return `<div class="${cls}">
+      <div class="hole-num">Hole ${h.hole}</div>
+      <div class="hole-lbl">Tee off</div>
+      <div class="hole-time">${h.time}</div>
+      <div class="hole-lbl" style="margin-top:4px">Finish by</div>
+      <div class="hole-by">${h.completeBy}</div>
+      ${act}
+    </div>`;
+    return `<div class="${cls}">
+      <div class="hole-num">Hole ${h.hole}</div>
+      <div class="hole-time">${h.time}</div>
+      <div class="hole-by">${h.completeBy}</div>
+      ${act}
+    </div>`;
+  }).join('');
+
+  return `<div class="tee-card h${g.holesCount}">
+    <div class="tee-hdr">
+      <div>
+        <div class="tee-title">${g.name} ${badge}${g.field?`<span style="font-size:11px;color:var(--text2)">${g.field}</span>`:''}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:3px">${g.players.join(' · ')||'—'}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">Starting hole ${g.startHole}</div>
       </div>
-    </div>`;
-}
-function normGroups(pg){
-  const ch=CH(), dh=ch===9?9:18;
-  const gs=pg.map(p=>({ start:hm(toMin(p.start)==null?480:toMin(p.start)),
-                        startHole:Math.min(Math.max(+p.startHole||1,1),ch),
-                        holes:Math.min(Math.max(+p.holes||dh,1),36),
-                        name:p.name||null,
-                        players:(p.players||[]).map(flipName) }));
-  gs.sort((a,b)=>(toMin(a.start)-toMin(b.start))||(a.startHole-b.startHole));
-  return gs;
-}
-function hasTimes(){ return S.groups.some(g=>g.fin&&g.fin.some(x=>x!=null)); }
-function goLive(label,pg){
-  if(hasTimes()){
-    if(!confirm("The current round has recorded times. OK = archive it to Records and load the new round. Cancel = keep the current round.")) return false;
-    S.records.unshift(snapshotRound());
-    S.log=[];
-  }
-  S.groups=normGroups(pg).map((p,i)=>({ id:Date.now()+i, name:p.name||("Group "+(i+1)), players:p.players,
-      start:p.start, startHole:p.startHole, holes:p.holes, fin:Array(36).fill(null), lastStatus:null }));
-  S.myGroup=null;
-  logAdd("—",`${label||"draw"} loaded: ${S.groups.length} groups, first tee ${S.groups[0].start}`,'');
-  return true;
-}
-function useLiveRound(ri){
-  if(!goLive(pending[ri].label,pending[ri].groups)) return;
-  pending=null; save(); renderAll(); toast("Round loaded"); show('field');
-}
-function queueRound(ri){
-  S.upcoming.push({label:pending[ri].label,groups:normGroups(pending[ri].groups)});
-  pending.splice(ri,1); if(!pending.length) pending=null;
-  save(); renderAll(); toast("Round queued");
-}
-function useAllRounds(){
-  if(!goLive(pending[0].label,pending[0].groups)) return;
-  for(let i=1;i<pending.length;i++) S.upcoming.push({label:pending[i].label,groups:normGroups(pending[i].groups)});
-  pending=null; save(); renderAll(); toast("Loaded — later rounds queued"); show('field');
-}
-function queueAllRounds(){
-  pending.forEach(r=>S.upcoming.push({label:r.label,groups:normGroups(r.groups)}));
-  pending=null; save(); renderAll(); toast("All rounds queued");
-}
-function makeLive(i){
-  if(S.role!=='official') return;
-  const r=S.upcoming[i];
-  if(!goLive(r.label,r.groups)) return;
-  S.upcoming.splice(i,1);
-  save(); renderAll(); toast(r.label+" is now live"); show('field');
-}
-function removeUpcoming(i){
-  if(!confirm("Remove "+S.upcoming[i].label+" from the queue?")) return;
-  S.upcoming.splice(i,1); save(); renderAll();
-}
-function renderUpcoming(){
-  const el=$('upcomingList'); if(!el) return;
-  el.innerHTML = S.upcoming.length
-    ? S.upcoming.map((r,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)">
-        <span><b>${esc(r.label)}</b> — ${r.groups.length} groups, first tee ${hm(toMin(r.groups[0].start))}</span>
-        <span class="row" style="flex:0 0 auto;gap:6px">
-          <button class="ghost" style="padding:7px 10px;font-size:.78rem" onclick="makeLive(${i})">Make live</button>
-          <button class="subtle" style="padding:7px 10px;font-size:.78rem" onclick="removeUpcoming(${i})">&times;</button>
-        </span>
-      </div>`).join("")
-    : `No rounds queued. When a draw file contains several rounds ("Round 1", "Round 2"...) the later ones queue here automatically — or queue any parsed draw from the preview.`;
+      <div class="tee-badge">Tee ${g.teeTime}</div>
+    </div>
+    ${status}
+    ${pace}
+    <div class="holes-grid">${holesHtml}</div>
+  </div>`;
 }
 
-/* File import — CSV/TXT native; XLSX/DOCX/PDF via readers fetched once from a CDN */
-function lib(url){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=url; s.onload=res; s.onerror=()=>rej(new Error("offline")); document.head.appendChild(s); }); }
-async function parseFile(f){
-  if(!f) return;
-  const msg=$('fileMsg'); msg.textContent="Reading "+f.name+" …";
-  const ext=f.name.toLowerCase().split('.').pop();
-  try{
-    let text="";
-    if(ext==='csv'||ext==='txt'){
-      text=await f.text();
-      text=text.split(/\r?\n/).map(l=>l.split(/,|;/).join(", ")).join("\n");
-    }else if(ext==='xlsx'||ext==='xls'){
-      if(!window.XLSX) await lib("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js");
-      const wb=XLSX.read(await f.arrayBuffer());
-      text=wb.SheetNames.map(n=>XLSX.utils.sheet_to_csv(wb.Sheets[n])).join("\n")
-             .split(/\r?\n/).map(l=>l.split(",").join(", ")).join("\n");
-    }else if(ext==='docx'){
-      if(!window.mammoth) await lib("https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js");
-      text=(await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()})).value;
-    }else if(ext==='pdf'){
-      if(!window.pdfjsLib) await lib("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
-      pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-      const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
-      for(let p=1;p<=pdf.numPages;p++){
-        const c=await (await pdf.getPage(p)).getTextContent();
-        let y=null,line=[]; const lines=[];
-        c.items.forEach(it=>{ const ty=Math.round(it.transform[5]);
-          if(y!==null&&Math.abs(ty-y)>3){ lines.push(line.join("  ")); line=[]; } y=ty; line.push(it.str); });
-        lines.push(line.join("  ")); text+=lines.join("\n")+"\n";
-      }
-    }else if(f.type.startsWith("image/")||["png","jpg","jpeg","webp","heic","gif"].includes(ext)){
-      msg.textContent="Reading text from the photo — this can take 10–20 seconds…";
-      if(!window.Tesseract) await lib("https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js");
-      const res=await Tesseract.recognize(f,'eng',{logger:m=>{ if(m.status==='recognizing text') msg.textContent="Reading photo… "+Math.round((m.progress||0)*100)+"%"; }});
-      text=res.data.text||"";
-      if(text.trim().length<10){ msg.textContent="Couldn't read text from that image — try a straighter, clearer photo, or paste the draw text."; return; }
-      /* OCR isn't perfect: show for review in the Paste tab rather than importing blind */
-      $('pasteBox').value=text; drawTab('paste');
-      msg.textContent="";
-      toast("Check the text, then tap Read draw");
-      return;
-    }else{ msg.textContent="Unsupported file type — paste the draw text instead."; return; }
-    if(isShotgun(text)){ msg.textContent=""; shotgunFlow(text); return; }
-    const r=parseRounds(text);
-    if(!r.length){ msg.textContent="Read the file but couldn't find tee times. Try pasting the draw text instead."; return; }
-    msg.textContent="";
-    pending=r; renderPreview();
-  }catch(e){
-    msg.textContent = e.message==="offline"
-      ? "That file type needs internet the first time (to fetch a reader). You're offline — paste the draw text instead, it always works."
-      : "Couldn't read that file — paste the draw text instead.";
-  }
+// ═══════════════════════════════════════════════
+// SHARE / QR
+// ═══════════════════════════════════════════════
+function compressName(n){
+  const p=n.trim().split(/\s+/);
+  return p.length<2?n:p[0][0].toUpperCase()+'.'+p[p.length-1];
+}
+function t2m(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
+
+function buildShareUrl(evId){
+  const ev=db.events.find(e=>e.id===evId); if(!ev||!ev.groups.length) return '';
+  const payload={n:ev.name,c:ev.course||'',d:ev.date||'',i:db.intervals[0],
+    g:ev.groups.map(g=>({t:t2m(g.teeTime),s:g.startHole,h:g.holesCount,p:g.players.map(compressName),n:g.name}))};
+  const b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  const enc=b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+  return `${location.origin}${location.pathname}?view=${enc}`;
 }
 
-/* Manual entry */
-let manual=[];
-function manualAdd(){
-  const s=$('setInterval').value||S.settings.interval||9;
-  const dh = CH()===9 ? 9 : 18;
-  const t = manual.length ? hm(toMin(manual[manual.length-1].start)+ +s) : "8:00";
-  manual.push({start:t,startHole:1,holes:dh,players:[]}); renderManual();
-}
-function renderManual(){
-  $('manualRows').innerHTML=(manual.length?`<div class="drawrow drawhead"><span>Time</span><span>Tee</span><span>Holes</span><span>Players</span><span></span></div>`:"")+
-   manual.map((g,i)=>`
-    <div class="drawrow">
-      <input value="${esc(g.start)}" onchange="manual[${i}].start=this.value">
-      <input type="number" min="1" max="${CH()}" value="${g.startHole}" onchange="manual[${i}].startHole=+this.value">
-      <input type="number" min="1" max="36" value="${g.holes}" onchange="manual[${i}].holes=+this.value">
-      <input placeholder="Names, comma separated" value="${esc(g.players.join(', '))}" onchange="manual[${i}].players=splitPlayers(this.value)">
-      <button onclick="manual.splice(${i},1);renderManual()">&times;</button>
-    </div>`).join("");
-  $('manualUseBtn').style.display=manual.length?'block':'none';
-}
-function manualUse(){
-  const gs=manual.filter(m=>m.players.length||toMin(m.start)!=null);
-  if(!gs.length) return;
-  pending=[{label:"Round "+(S.upcoming.length+1),groups:gs}]; manual=[]; renderManual(); renderPreview();
+function renderShare(){
+  const sel=document.getElementById('share-event-select');
+  sel.innerHTML=db.events.length
+    ?db.events.map(e=>`<option value="${e.id}" ${e.id===db.activeId?'selected':''}>${e.name}</option>`).join('')
+    :'<option>No events yet</option>';
+  updateShareQR();
 }
 
-/* ================= SETTINGS ================= */
-function saveEventSettings(){
-  S.settings.name=$('setName').value.trim();
-  S.settings.date=$('setDate').value;
-  S.settings.interval=+$('setInterval').value||9;
-  S.settings.courseHoles=+$('setCourse').value||18;
-  S.settings.teamsEvent=$('setTeams').checked;
-  S.groups.forEach(g=>{ if((g.startHole||1)>CH()) g.startHole=1; g.lastStatus=null; });
-  refreshStatuses(); save(); renderHeader(); renderSettings(); renderAll(); toast("Event saved");
-}
-function renderSettings(){
-  $('setName').value=S.settings.name; $('setDate').value=S.settings.date; $('setInterval').value=S.settings.interval;
-  $('setCourse').value=S.settings.courseHoles;
-  $('setTeams').checked=!!S.settings.teamsEvent;
-  $('thAmber').value=S.settings.thAmber; $('thRed').value=S.settings.thRed;
-  $('tpGrid').innerHTML=Array.from({length:CH()},(_,i)=>`<label>H${i+1}<input type="number" min="8" max="25" value="${S.settings.timePar[i]}" data-tp="${i}" oninput="tpTotal()"></label>`).join("");
-  tpTotal();
-}
-function tpTotal(){
-  let t=0; document.querySelectorAll('[data-tp]').forEach(inp=>t+= +inp.value||0);
-  $('tpTotal').textContent=Math.floor(t/60)+"h "+(t%60).toString().padStart(2,'0')+"m ("+t+" min)"+(CH()===9?" per lap of 9":"");
-}
-function saveTimePar(){
-  document.querySelectorAll('[data-tp]').forEach(inp=>S.settings.timePar[+inp.dataset.tp]=+inp.value||14);
-  S.groups.forEach(g=>g.lastStatus=null); refreshStatuses(); save(); renderAll(); toast("Time par saved");
-}
-function tpSpread(){
-  const def = CH()===9 ? "128" : "255";
-  const v=prompt(`Total time for ${CH()} holes, in minutes (e.g. ${def} for ${CH()===9?"2h08":"4h15"}):`,def);
-  const t=+v; if(!t||t<60) return;
-  document.querySelectorAll('[data-tp]').forEach(inp=>inp.value=Math.round(t/CH()));
-  tpTotal();
-}
-function saveThresholds(){
-  S.settings.thAmber=+$('thAmber').value||3; S.settings.thRed=+$('thRed').value||8;
-  S.groups.forEach(g=>g.lastStatus=null); refreshStatuses(); save(); renderAll(); toast("Thresholds saved");
-}
-function renderDrawCurrent(){
-  $('drawCurrent').innerHTML = S.groups.length
-    ? S.groups.map((g,i)=>`<div style="padding:4px 0"><b class="num">${hm(toMin(g.start))}</b> tee ${g.startHole||1}, ${gHoles(g)}h — ${i+1}. ${esc(g.players.join(', '))||'(no names)'}</div>`).join("")
-    : "No draw loaded.";
-}
-
-/* ================= LOG ================= */
-function renderLog(){
-  $('noteGroup').innerHTML=`<option value="—">General</option>`+S.groups.map(g=>`<option>${esc(g.name)}</option>`).join("");
-  $('logList').innerHTML = S.log.length
-    ? S.log.map(l=>`<div class="logline ${l.sev==='red'?'lr':l.sev==='green'?'lg':''}">
-        <span class="t">${hm(l.t)}</span><span class="m"><b>${esc(l.g)}</b> ${esc(l.msg)}</span></div>`).join("")
-    : `<span class="muted small">Nothing logged yet. Out-of-position flags land here automatically, with timestamps, as times are recorded.</span>`;
-}
-function addNote(){
-  const t=$('noteText').value.trim(); if(!t) return;
-  logAdd($('noteGroup').value,t,''); $('noteText').value="";
-  save(); renderLog(); toast("Noted");
-}
-
-/* ================= RECORDS ================= */
-function snapshotRound(){
-  return {
-    name:S.settings.name||"Untitled round", date:S.settings.date,
-    timePar:S.settings.timePar.slice(), interval:S.settings.interval, courseHoles:CH(),
-    groups:S.groups.map(g=>({name:g.name,players:g.players,start:g.start,startHole:g.startHole||1,holes:gHoles(g),fin:g.fin.slice()})),
-    log:S.log.slice()
-  };
-}
-function archiveRound(){
-  if(S.role!=='official') return;
-  if(!S.groups.length){ alert("No groups to archive."); return; }
-  const next=S.upcoming.length? ` "${S.upcoming[0].label}" is queued — load it from the Draw tab afterwards.`:"";
-  if(!confirm("Archive this round and clear the live field?"+next)) return;
-  S.records.unshift(snapshotRound());
-  S.groups.forEach(g=>{ g.fin=Array(36).fill(null); g.lastStatus=null; });
-  S.log=[]; save(); renderAll(); toast("Round archived"); 
-}
-function recParG(r,g){
-  const ch=r.courseHoles||18; let t=0;
-  for(let k=0;k<g.holes;k++) t+= +r.timePar[((g.startHole-1+k)%ch)]||14;
-  return t;
-}
-function renderRecords(){
-  const el=$('recordsList');
-  if(!S.records.length){ el.innerHTML=`<div class="card muted small">No archived rounds yet. Archive a round above and every group's hole-by-hole times land here — your timing record builds over time.</div>`; return; }
-  el.innerHTML=S.records.map((r,ri)=>{
-    const rows=r.groups.map(g=>{
-      const gh=g.holes||18;
-      const n=g.fin.slice(0,gh).filter(x=>x!=null).length;
-      const done=n===gh;
-      const total=done? g.fin[gh-1]-toMin(g.start) : null;
-      const par=recParG(r,g);
-      return `<tr><td>${esc(g.players.join(', ')||g.name)}</td>
-        <td class="num">${hm(toMin(g.start))} / T${g.startHole||1}</td>
-        <td class="num">${done?Math.floor(total/60)+"h "+Math.round(total%60).toString().padStart(2,'0')+" ("+gh+"h)":"thru "+n+"/"+gh}</td>
-        <td class="num ${done?(total-par>0?'tm':'tp'):''}">${done?signed(total-par):""}</td></tr>`;
-    }).join("");
-    const totals=r.groups.map(g=>{const gh=g.holes||18; return g.fin[gh-1]!=null?g.fin[gh-1]-toMin(g.start):null}).filter(x=>x!=null);
-    const best=totals.length?Math.min(...totals):null;
-    return `<details><summary>${esc(r.name)} — ${esc(r.date)} <span class="muted small">(${r.groups.length} groups${best!=null?", fastest "+Math.floor(best/60)+"h "+Math.round(best%60).toString().padStart(2,'0'):""})</span></summary>
-      <div class="inner">
-        <table class="holes"><tr><th>Group</th><th>Tee</th><th>Round</th><th>v par</th></tr>${rows}</table>
-        <button class="ghost" style="margin-top:10px" onclick="exportCSV(${ri})">Download this round (CSV)</button>
-      </div></details>`;
-  }).join("");
-}
-function exportCSV(ri){
-  const r=S.records[ri];
-  const ch=r.courseHoles||18;
-  const maxH=Math.max(...r.groups.map(g=>g.holes||18));
-  let csv="Group,Players,Tee time,Start hole,Holes,"+Array.from({length:maxH},(_,i)=>"Seq"+(i+1)).join(",")+",Total(min),VsPar(min)\n";
-  r.groups.forEach(g=>{
-    const gh=g.holes||18, start=toMin(g.start);
-    const times=Array.from({length:maxH},(_,k)=>{
-      if(k>=gh) return "";
-      const prev=k===0?start:g.fin[k-1];
-      return g.fin[k]!=null&&prev!=null?Math.round((g.fin[k]-prev)*10)/10:"";
-    });
-    const total=g.fin[gh-1]!=null?Math.round(g.fin[gh-1]-start):"";
-    csv+=`"${g.name}","${g.players.join('; ')}",${g.start},${g.startHole||1},${gh},${times.join(",")},${total},${total!==""?total-recParG(r,g):""}\n`;
+function updateShareQR(){
+  const sel=document.getElementById('share-event-select');
+  const evId=parseInt(sel.value);
+  const ev=db.events.find(e=>e.id===evId);
+  const url=buildShareUrl(evId);
+  const empty=document.getElementById('qr-empty');
+  const section=document.getElementById('qr-section');
+  if(!url){ empty.style.display='block'; section.style.display='none'; return; }
+  empty.style.display='none'; section.style.display='block';
+  document.getElementById('share-url-display').textContent=url;
+  // QR
+  ['qr-canvas','poster-qr'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    el.innerHTML='';
+    try{ new QRCode(el,{text:url,width:i?220:200,height:i?220:200,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M}); }
+    catch(e){ el.textContent='QR error'; }
   });
-  download(csv,"text/csv",(r.name||"round").replace(/\W+/g,"-")+".csv");
+  // Poster
+  if(ev){ document.getElementById('poster-title').textContent=ev.name; document.getElementById('poster-sub').textContent=[ev.course,ev.date].filter(Boolean).join(' · '); }
 }
 
-/* ================= EXPORT / IMPORT / MERGE ================= */
-function download(data,type,name){
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([data],{type})); a.download=name; a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
-}
-function exportJSON(){ download(JSON.stringify(S),"application/json","pace-"+(S.settings.date||"data")+".json"); }
-async function importJSON(f){
-  if(!f) return;
-  try{
-    const inc=migrate(JSON.parse(await f.text()));
-    if(!inc.groups){ alert("That doesn't look like a Pace of Play export."); return; }
-    if(!S.groups.length){
-      const keepRole=S.role, keepPin=S.settings.pin;
-      S=inc; S.role=keepRole; S.myGroup=null;
-      S.settings.pin = keepPin || inc.settings.pin;   // event PIN unlocks official mode if this phone had none
-    }
-    else{
-      // merge: match groups by tee time + start hole (then name); imported times fill gaps
-      inc.groups.forEach(ig=>{
-        const g=S.groups.find(x=>x.start===ig.start&&(x.startHole||1)===(ig.startHole||1))||S.groups.find(x=>x.name===ig.name);
-        if(g) ig.fin.forEach((f,i)=>{ if(f!=null&&g.fin[i]==null) g.fin[i]=f; });
-      });
-      const seen=new Set(S.log.map(l=>l.dt+l.msg));
-      (inc.log||[]).forEach(l=>{ if(!seen.has(l.dt+l.msg)) S.log.push(l); });
-      S.log.sort((a,b)=>b.dt<a.dt?-1:1);
-    }
-    S.groups.forEach(g=>g.lastStatus=null); refreshStatuses(); save(); applyRole(); renderAll();
-    toast("Data merged");
-  }catch(e){ alert("Couldn't read that file."); }
-  $('importBox').value="";
-}
-function wipe(){
-  if(S.role!=='official') return;
-  if(!confirm("Erase the draw, times, log, records and admin PIN on this phone?")) return;
-  S=blank(); try{localStorage.removeItem('pace-v1')}catch(e){}
-  save(); applyRole(); renderAll(); show('role'); toast("Erased");
+function copyShareUrl(){
+  const url=document.getElementById('share-url-display').textContent;
+  const msg=document.getElementById('copy-msg');
+  navigator.clipboard.writeText(url)
+    .then(()=>{ msg.textContent='✓ Copied!'; setTimeout(()=>msg.textContent='',2500); })
+    .catch(()=>{ const t=document.createElement('textarea'); t.value=url; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); msg.textContent='✓ Copied!'; setTimeout(()=>msg.textContent='',2500); });
 }
 
-/* ================= ROLES =================
-   'official' sees everything; 'player' sees only Field (read-only) and
-   Player, and cannot reach setup, the log, records or erase. Official
-   mode is behind a PIN so a handed-over or player phone stays locked. */
-function pinHash(s){ let h=5381; for(const c of s) h=((h*33)^c.charCodeAt(0))>>>0; return "h"+h; }
-function chooseOfficial(){
-  if(!S.settings.pin){
-    const p=prompt("Create an admin PIN (at least 4 characters). Anyone switching this app to official mode will need it:");
-    if(p===null) return;
-    if(p.trim().length<4){ alert("PIN needs at least 4 characters."); return; }
-    S.settings.pin=pinHash(p.trim());
-  }else{
-    const p=prompt("Enter the admin PIN:");
-    if(p===null) return;
-    if(pinHash(p.trim())!==S.settings.pin){ alert("Wrong PIN."); return; }
-  }
-  S.role='official'; save(); applyRole(); renderAll(); show(S.groups.length?'field':'draw');
-}
-function choosePlayer(){
-  S.role='player'; save(); applyRole(); renderAll(); show('player');
-}
-function lockToPlayer(){
-  if(!S.settings.pin){ alert("Set up official mode first so a PIN exists — otherwise anyone can switch back."); return; }
-  choosePlayer(); toast("Locked to player mode");
-}
-function applyRole(){
-  const off=S.role==='official';
-  document.querySelector('nav').style.display = S.role? 'flex':'none';
-  ['nb-draw','nb-log','nb-more'].forEach(id=>$(id).style.display= off? '':'none');
-}
-const OFFICIAL_ONLY=['draw','log','more','group'];
-
-/* ================= SHARE (QR / link) =================
-   The whole live event (draw + settings, incl. the admin PIN hash so player
-   phones stay locked) is packed into the URL after #e=. Scanning opens the
-   app with the event loaded, in player mode. */
-function packEvent(){
-  const p={ v:1, s:{n:S.settings.name,d:S.settings.date,i:S.settings.interval,c:S.settings.courseHoles,
-            tp:S.settings.timePar.slice(0,CH()),a:S.settings.thAmber,r:S.settings.thRed,t:S.settings.teamsEvent?1:0,p:S.settings.pin||null},
-    g:S.groups.map(g=>[g.start,g.startHole||1,gHoles(g),g.players]) };
-  const b=btoa(unescape(encodeURIComponent(JSON.stringify(p)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-  return location.origin+location.pathname+"#e="+b;
-}
-function unpackEvent(hash){
-  const m=hash.match(/#e=([A-Za-z0-9\-_]+)/); if(!m) return null;
-  try{
-    const b=m[1].replace(/-/g,'+').replace(/_/g,'/');
-    const p=JSON.parse(decodeURIComponent(escape(atob(b+'=='.slice(0,(4-b.length%4)%4)))));
-    if(!p.g) return null;
-    return p;
-  }catch(e){ return null; }
-}
-function applyShared(p){
-  S.settings.name=p.s.n||""; S.settings.date=p.s.d||S.settings.date;
-  S.settings.interval=p.s.i||9; S.settings.courseHoles=p.s.c||18;
-  (p.s.tp||[]).forEach((v,i)=>S.settings.timePar[i]=+v||14);
-  S.settings.thAmber=p.s.a||3; S.settings.thRed=p.s.r||8;
-  S.settings.teamsEvent=!!p.s.t;
-  if(p.s.p) S.settings.pin=p.s.p;      // event PIN guards official mode on this phone
-  S.groups=p.g.map((a,i)=>({id:Date.now()+i,name:"Group "+(i+1),start:a[0],startHole:a[1],holes:a[2],
-    players:(a[3]||[]).map(flipName),fin:Array(36).fill(null),lastStatus:null}));
-  S.myGroup=null;
-  if(S.role!=='official') S.role='player';
-  save();
-}
-function checkSharedLink(){
-  const p=unpackEvent(location.hash); if(!p) return false;
-  if(S.groups.length && hasTimes()){
-    if(!confirm("This link contains an event. Load it? Your current round's times will be replaced (Cancel keeps them).")){ history.replaceState(null,"",location.pathname); return false; }
-  }
-  applyShared(p);
-  history.replaceState(null,"",location.pathname);   // tidy the URL
-  toast("Event loaded from link");
-  return true;
-}
-function makeQR(){
-  if(!S.groups.length){ alert("Load a draw first."); return; }
-  const url=packEvent();
-  $('qrWrap').style.display='block';
-  $('qrUrl').textContent=url;
-  $('qrMsg').textContent = url.length>2300 ? "Long draw — the QR may be dense; the copy-link button always works (share by text/WhatsApp)." : "";
-  const box=$('qrBox'); box.innerHTML="";
-  const draw=()=>{ try{ new QRCode(box,{text:url,width:220,height:220,correctLevel:QRCode.CorrectLevel.L}); }
-                   catch(e){ box.textContent="QR too dense — use Copy link instead."; } };
-  if(window.QRCode) draw();
-  else lib("https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js").then(draw)
-        .catch(()=>{ box.textContent="QR needs internet once — Copy link still works."; });
-}
-function copyShare(){
-  const url=$('qrUrl').textContent;
-  (navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject()).then(()=>toast("Link copied"))
-    .catch(()=>{ prompt("Copy this link:",url); });
-}
-function printQR(){
-  const ev=esc(S.settings.name||"Golf event");
-  $('printArea').innerHTML=`<div style="text-align:center;padding:40px 0">
-    <div style="font-size:26px;font-weight:800">${ev}</div>
-    <div style="color:#666;margin:6px 0 24px">${esc(S.settings.date||"")}</div>
-    <div style="display:flex;justify-content:center">${$('qrBox').innerHTML}</div>
-    <div style="font-size:18px;margin-top:20px">Scan to see your tee time &amp; pace schedule</div></div>`;
+function printQRPoster(){
+  document.getElementById('qr-poster').style.display='block';
   window.print();
+  document.getElementById('qr-poster').style.display='none';
 }
 
-/* ================= PRINT SCHEDULE SHEETS ================= */
-function printSchedules(){
-  if(!S.groups.length){ alert("No groups to print."); return; }
-  const sheets=S.groups.map((g,i)=>{
-    const gh=gHoles(g), start=toMin(g.start);
-    let rows="";
-    for(let k=0;k<gh;k++){
-      rows+=`<tr><td>${holeSeq(g,k)}</td><td>${hm(start+cumParG(g,k))}</td><td>${hm(start+cumParG(g,k+1))}</td></tr>`;
-    }
-    return `<div class="psheet">
-      <b>${i+1}. ${esc(g.players.join(', ')||g.name)}</b>
-      <div style="font-size:12px;color:#555;margin:2px 0 8px">Tee ${hm(start)} · start hole ${g.startHole||1} · ${gh} holes</div>
-      <table><tr><th>Hole</th><th>Tee off</th><th>Finish by</th></tr>${rows}</table>
-    </div>`;
-  }).join("");
-  $('printArea').innerHTML=`<div style="margin-bottom:14px"><b style="font-size:18px">${esc(S.settings.name||"Pace of play schedules")}</b> — ${esc(S.settings.date||"")}</div>`+sheets;
-  window.print();
+// ═══════════════════════════════════════════════
+// PRINT
+// ═══════════════════════════════════════════════
+function renderPrint(){
+  const ev=activeEvent();
+  const el=document.getElementById('print-content');
+  if(!ev){ el.innerHTML='<div class="empty">No active event</div>'; return; }
+  let groups=ev.groups;
+  if(printFilter!=='all') groups=groups.filter(g=>String(g.holesCount)===printFilter);
+  el.innerHTML=groups.length?groups.map(g=>renderTeeCard(g,false)).join(''):'<div class="empty">No groups</div>';
 }
 
-/* ================= SHOTGUN DRAWS =================
-   "Hole 12  Team Mohi — J Smith, A Brown" style: one tee time for the whole
-   field, start holes per line, optional "(2nd Group)" second wave. */
-function isShotgun(txt){
-  const holeLines=(txt.match(/^\s*hole\s+\d+/gim)||[]).length;
-  const times=(txt.match(/\b\d{1,2}[:.]\d{2}\s*(am|pm)?\b/gi)||[]).length;
-  return holeLines>=3 && times<=2;
+function setPrintFilter(f,btn){
+  printFilter=f;
+  document.querySelectorAll('#sec-print .btn-sm').forEach(b=>b.classList.remove('btn-primary'));
+  btn.classList.add('btn-primary');
+  renderPrint();
 }
-function shotgunFlow(txt){
-  const stm=txt.match(/start[:\s]+(\d{1,2}[:.]\d{2}\s*(?:am|pm)?)/i);
-  const t1=prompt("Shotgun draw detected — tee time for the field? (e.g. 8:45 am)", stm?stm[1]:"8:45 am");
-  if(t1===null||toMin(t1)==null){ if(t1!==null) alert("Couldn't read that time."); return; }
-  let t2=null;
-  if(/\(2nd/i.test(txt)){
-    t2=prompt("This draw has a 2nd wave — its tee time? (e.g. 11:00 am)","");
-    if(t2!==null && toMin(t2)==null) t2=null;
+
+// ═══════════════════════════════════════════════
+// SHARED VIEW (player-only via ?view=...)
+// ═══════════════════════════════════════════════
+function checkSharedView(){
+  const raw=location.search;
+  const match=raw.match(/[?&]view=([^&]*)/);
+  if(!match) return false;
+
+  function showErr(msg,detail){
+    document.getElementById('main-tabs').innerHTML='<button type="button" class="tab active">⛳ Find my tee time</button>';
+    document.getElementById('sec-player').classList.add('active');
+    document.getElementById('player-result').innerHTML=
+      `<div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:var(--r);padding:1rem;font-size:13px;margin-top:1rem">
+        <b>Could not load draw</b><br><br>
+        ${msg}<br><small style="color:var(--text2)">${detail||''}</small>
+      </div>`;
   }
-  const dh = CH()===9 ? 9 : (prompt("Holes each group plays? (9 or 18)","9")==="18"?18:9);
-  const groups=[];
-  txt.split(/\r?\n/).forEach(line=>{
-    const m=line.match(/^\s*hole\s+(\d{1,2})\s*(\(2nd[^)]*\))?\s*(.*)$/i);
-    if(!m) return;
-    let rest=m[3].trim(), team="";
-    const dm=rest.match(/^(.*?)\s*[—–:-]\s+(.*)$/);           // "Team Mohi — players..."
-    if(dm && dm[2].trim()){ team=dm[1].trim(); rest=dm[2]; }
-    const players=splitPlayers(rest);
-    if(!players.length && !rest) return;
-    groups.push({ start: (m[2]&&t2)? t2 : t1, startHole:+m[1], holes:dh, players, name:team||null });
-  });
-  if(!groups.length){ alert("Found 'Hole N' lines but no team/player names — check the text."); return; }
-  pending=[{label:"Shotgun round",groups}];
-  renderPreview();
+
+  try {
+    const enc=match[1];
+    let latin1;
+    try { const b64=enc.replace(/-/g,'+').replace(/_/g,'/'); const pad=b64+'=='.slice(0,(4-b64.length%4)%4); latin1=atob(decodeURIComponent(pad)); }
+    catch(e){ showErr('Could not decode link','atob: '+e.message); return true; }
+    let r;
+    try { r=JSON.parse(decodeURIComponent(latin1.split('').map(c=>'%'+c.charCodeAt(0).toString(16).padStart(2,'0')).join(''))); }
+    catch(e){ showErr('Could not read draw data','JSON: '+e.message.substring(0,80)); return true; }
+    if(!r.g||!Array.isArray(r.g)){ showErr('No groups in data',''); return true; }
+
+    const intervals=Array.isArray(r.i)?r.i:Array(18).fill(r.i||13);
+    db.intervals=intervals;
+    const ev={id:9999,name:r.n||'Event',course:r.c||'',date:r.d||'',comp:'',groups:
+      r.g.map((g,i)=>({id:i,name:g.n||`Group ${i+1}`,teeTime:typeof g.t==='number'?fmt2(g.t):g.t,startHole:g.s,holesCount:g.h,field:'',players:g.p||[]}))};
+    db.events=[ev]; db.activeId=9999;
+
+    document.getElementById('hdr-title').textContent=r.e||r.n||'Tee Times';
+    document.getElementById('hdr-sub').textContent=[r.c,r.d].filter(Boolean).join(' · ')||'Golf Pace of Play';
+    document.getElementById('main-tabs').innerHTML='<button type="button" class="tab active" onclick="goTab(\'player\',this)">⛳ Find my tee time</button>';
+    document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+    document.getElementById('sec-player').classList.add('active');
+    syncPlayerSection();
+    return true;
+  } catch(e){ showErr('Unexpected error',e.message); return true; }
 }
 
-/* ================= NAV / INIT ================= */
-function show(s){
-  if(S.role==null && s!=='role') s='role';
-  if(S.role==='player' && OFFICIAL_ONLY.includes(s)) s='player';
-  document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));
-  $('scr-'+s).classList.add('on');
-  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));
-  const nb=$('nb-'+(s==='group'?'field':s)); if(nb) nb.classList.add('on');
-  window.scrollTo(0,0);
-  if(s==='group') renderGroup();
+function fmt2(mins){ return String(Math.floor(mins/60)%24).padStart(2,'0')+':'+String(mins%60).padStart(2,'0'); }
+
+// ═══════════════════════════════════════════════
+// LIVE CLOCK
+// ═══════════════════════════════════════════════
+function tickClock(){
+  const n=new Date();
+  const el=document.getElementById('clock');
+  if(el) el.textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+  const fsec=document.getElementById('sec-field');
+  if(fsec&&fsec.classList.contains('active')) renderField();
+  const ps=document.getElementById('sec-player');
+  if(ps&&ps.classList.contains('active')){
+    // Refresh visible result quietly
+    if(searchTab==='name'){
+      const q=document.getElementById('player-search').value;
+      if(q.length>=2) showPlayerResult(q);
+    } else {
+      showTeeGroup();
+    }
+  }
 }
-function renderHeader(){
-  $('hdrEvent').textContent = S.settings.name ? S.settings.name+" · "+S.settings.date : "No event set up";
-}
-function renderAll(){
-  renderHeader(); renderField(); renderPlayer(); renderDrawCurrent(); renderUpcoming(); renderLog(); renderRecords();
-  if($('scr-group').classList.contains('on')) renderGroup();
-}
-const fromLink=checkSharedLink();
-renderSettings(); renderAll(); applyRole();
-show(fromLink ? 'player' : S.role==null ? 'role' : S.role==='official' ? (S.groups.length?'field':'draw') : 'player');
-/* Keep 'due by' clocks, pending statuses and player schedule nudges fresh */
-setInterval(()=>{ if(document.visibilityState!=='visible') return;
-  renderField();
-  if(document.activeElement?.id!=='pSearch') renderPlayer();
-}, 30000);
-setInterval(()=>{ const c=$('pClock'); if(c) c.textContent=hm(nowMin()); }, 15000);
-/* Offline support once hosted (e.g. GitHub Pages) */
-if('serviceWorker' in navigator && location.protocol==='https:'){
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+setInterval(tickClock,15000);
+tickClock();
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+load();
+if(!checkSharedView()){
+  renderEventList();
+  updateHeader();
+  renderIntervalGrid();
 }
 </script>
 </body>
