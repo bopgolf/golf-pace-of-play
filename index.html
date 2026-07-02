@@ -136,6 +136,19 @@ table.holes td{padding:7px 4px;border-bottom:1px solid var(--line)}
 .status-hero .detail{margin-top:8px;font-size:.95rem}
 .status-hero .target{margin-top:6px;font-size:.85rem;color:var(--ink-soft)}
 
+/* player schedule grid */
+.hgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+@media(min-width:480px){.hgrid{grid-template-columns:repeat(6,1fr)}}
+.hcell{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 4px;text-align:center;cursor:pointer}
+.hcell .hc-num{font-size:.66rem;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em}
+.hcell .hc-lbl{font-size:.56rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin-top:3px}
+.hcell .hc-t{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700;font-size:.82rem}
+.hcell .hc-act{font-size:.68rem;font-family:var(--mono);margin-top:4px;font-weight:700}
+.hcell.past{opacity:.5}
+.hcell.now{background:var(--green);border-color:var(--green);transform:scale(1.06);box-shadow:0 3px 10px rgba(29,122,70,.35);opacity:1;position:relative;z-index:1}
+.hcell.now .hc-num,.hcell.now .hc-lbl{color:#CFE7D8}
+.hcell.now .hc-t,.hcell.now .hc-act{color:#fff}
+
 /* log */
 .logline{display:flex;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);font-size:.85rem}
 .logline .t{font-family:var(--mono);color:var(--ink-soft);white-space:nowrap}
@@ -182,6 +195,16 @@ details .inner{padding:0 14px 14px}
 .drawrow input{padding:8px}
 .drawrow button{padding:6px;background:transparent;color:var(--red);font-size:1.1rem}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+@media print{
+  header.app,nav,.toast,.banner{display:none!important}
+  main>*:not(#printArea){display:none!important}
+  #printArea{display:block!important}
+  body{background:#fff;padding-bottom:0}
+  .psheet{page-break-inside:avoid;border:1px solid #bbb;border-radius:8px;padding:12px;margin-bottom:12px}
+  .psheet table{width:100%;border-collapse:collapse;font-size:11px}
+  .psheet th,.psheet td{border-bottom:1px solid #ddd;padding:3px 4px;text-align:left}
+}
+.psheet{background:var(--card)}
 @media (min-width:700px){ .timepar-grid{grid-template-columns:repeat(6,1fr)} }
 </style>
 </head>
@@ -261,8 +284,8 @@ details .inner{padding:0 14px 14px}
   </div>
 
   <div class="card" id="draw-file" style="display:none">
-    <p class="muted small" style="margin-bottom:8px">Upload a CSV, Excel (.xlsx), Word (.docx), PDF or text file. Excel/Word/PDF need internet the <em>first</em> time (to fetch a reader); after that they work offline too. CSV and text always work offline — as does Paste.</p>
-    <input type="file" id="fileBox" accept=".csv,.txt,.xlsx,.xls,.docx,.pdf" onchange="parseFile(this.files[0])">
+    <p class="muted small" style="margin-bottom:8px">Upload a CSV, Excel (.xlsx), Word (.docx), PDF or text file — or a <b>photo/screenshot</b> of a paper draw (text is read from the image). Excel/Word/PDF/photo need internet the <em>first</em> time (to fetch a reader); after that they work offline too. CSV and text always work offline — as does Paste.</p>
+    <input type="file" id="fileBox" accept=".csv,.txt,.xlsx,.xls,.docx,.pdf,image/*" onchange="parseFile(this.files[0])">
     <p class="muted small" id="fileMsg" style="margin-top:8px"></p>
   </div>
 
@@ -317,6 +340,27 @@ details .inner{padding:0 14px 14px}
 
 <!-- ============ RECORDS / MORE ============ -->
 <section class="screen" id="scr-more">
+  <h2>Share with players — QR code</h2>
+  <div class="card">
+    <p class="muted small" style="margin-bottom:10px">Players scan this and the event opens on their phone in player mode — draw, time par and settings included. Print it for the noticeboard or first tee. (Generating the QR needs internet once; scanning players need internet to open the page the first time, then it works offline.)</p>
+    <button class="ghost" onclick="makeQR()">Generate QR &amp; link</button>
+    <div id="qrWrap" style="display:none;margin-top:12px;text-align:center">
+      <div id="qrBox" style="display:inline-block;background:#fff;padding:12px;border-radius:8px"></div>
+      <div id="qrUrl" class="muted small" style="word-break:break-all;margin-top:10px;text-align:left"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="copyShare()">Copy link</button>
+        <button class="ghost" onclick="printQR()">Print QR poster</button>
+      </div>
+      <div id="qrMsg" class="muted small" style="margin-top:6px"></div>
+    </div>
+  </div>
+
+  <h2>Print</h2>
+  <div class="card">
+    <p class="muted small" style="margin-bottom:10px">Prints every group's hole-by-hole schedule (tee-off and finish-by times) — one sheet section per group, for the noticeboard.</p>
+    <button class="ghost" onclick="printSchedules()">Print schedule sheets</button>
+  </div>
+
   <h2>Hand this phone over</h2>
   <div class="card">
     <p class="muted small" style="margin-bottom:10px">Locks the app to player/parent mode — no access to setup, log, records or erase. Your admin PIN gets back in via "Official sign-in" on the Player screen.</p>
@@ -347,6 +391,7 @@ details .inner{padding:0 14px 14px}
     <button class="danger" onclick="wipe()">Erase everything on this phone</button>
   </div>
 </section>
+<div id="printArea" style="display:none"></div>
 </main>
 
 <nav>
@@ -526,6 +571,28 @@ function recordAtHole(gi){
 /* Where the time par schedule says a group should be right now is computed
    inline in renderPlayer (schedHole) and refreshed on a timer. */
 
+/* Full round schedule: every hole with its planned tee-off and finish-by time
+   (in play order, wrap-aware), the clock-current hole highlighted, recorded
+   holes ticked with their actual +/-; tap any cell to set or fix a time. */
+function scheduleGrid(gi){
+  const g=S.groups[gi], gh=gHoles(g), start=toMin(g.start), now=nowMin();
+  let cells="";
+  for(let k=0;k<gh;k++){
+    const tee=start+cumParG(g,k), due=start+cumParG(g,k+1);
+    const isNow = now>=tee && now<due;
+    const rec = g.fin[k]!=null;
+    const diff = rec ? g.fin[k]-due : null;
+    cells+=`<div class="hcell${isNow?' now':''}${rec&&!isNow?' past':''}" onclick="editFinish(${gi},${k})">
+      <div class="hc-num">Hole ${holeSeq(g,k)}</div>
+      <div class="hc-lbl">Tee off</div><div class="hc-t">${hm(tee)}</div>
+      <div class="hc-lbl">Finish by</div><div class="hc-t">${hm(due)}</div>
+      ${rec?`<div class="hc-act ${diff>0?'tm':'tp'}">&#10003; ${hm(g.fin[k])} (${signed(diff)})</div>`:""}
+    </div>`;
+  }
+  return `<div class="hgrid">${cells}</div>
+    <p class="muted small" style="margin-top:8px;text-align:center">Times are your time par schedule from your tee time. Tap any hole to set or fix its actual time.</p>`;
+}
+
 /* ================= RENDER: FIELD ================= */
 function renderStrip(){
   const el=$('strip');
@@ -626,15 +693,34 @@ function setMyGroup(v){
   S.myGroup=idx; save(); renderPlayer();
 }
 function groupLabel(g,i){ return `${i+1}. ${esc(g.players.join(', '))||esc(g.name)} — ${hm(toMin(g.start))}, tee ${g.startHole||1}`; }
+/* Type-ahead: find your group by typing your name */
+function playerSearch(q){
+  const box=$('pSugg'); if(!box) return;
+  q=q.trim().toLowerCase();
+  if(q.length<2){ box.innerHTML=""; return; }
+  const hits=[];
+  S.groups.forEach((g,i)=>g.players.forEach(p=>{ if(p.toLowerCase().includes(q)) hits.push({p,i,g}); }));
+  box.innerHTML = hits.length
+    ? hits.slice(0,6).map(h=>`<button class="subtle" style="width:100%;text-align:left;margin-top:6px" onclick="setMyGroup('${h.i}')">
+        <b>${esc(h.p)}</b> — ${hm(toMin(h.g.start))}, tee ${h.g.startHole||1}${h.g.players.length>1?` · with ${esc(h.g.players.filter(x=>x!==h.p).join(', '))}`:""}</button>`).join("")
+    : `<p class="muted small" style="margin-top:6px">No player found for "${esc(q)}" — try the list below.</p>`;
+}
 function renderPlayer(){
   /* Individual events lock a player phone to its chosen group; officials and
      teams events keep the selector. */
   const locked = S.role==='player' && !S.settings.teamsEvent && S.myGroup!=null && S.groups[S.myGroup];
   $('myGroupCard').innerHTML = locked
-    ? `<div><span class="pill" style="background:var(--ink);color:#fff">Locked</span>
+    ? `<div><div class="row" style="align-items:center;margin-bottom:10px"><span class="muted small">Current time</span><b class="num" id="pClock" style="flex:0 0 auto;font-size:1.3rem">${hm(nowMin())}</b></div>
+       <span class="pill" style="background:var(--ink);color:#fff">Locked</span>
        <div style="margin-top:8px;font-weight:700">${groupLabel(S.groups[S.myGroup],S.myGroup)}</div>
        <p class="muted small" style="margin-top:6px">Individual event — this phone stays with this group. Wrong group? Use Official sign-in below.</p></div>`
-    : `<label class="f"><span>I'm playing in</span>
+    : `<div class="row" style="align-items:center;margin-bottom:10px">
+         <span class="muted small">Current time</span>
+         <b class="num" id="pClock" style="flex:0 0 auto;font-size:1.3rem">${hm(nowMin())}</b>
+       </div>
+       <label class="f"><span>Find your name</span><input id="pSearch" placeholder="Type your name…" oninput="playerSearch(this.value)"></label>
+       <div id="pSugg"></div>
+       <label class="f" style="margin-top:12px"><span>Or choose your group</span>
        <select id="myGroup" onchange="setMyGroup(this.value)">
          <option value="">— choose your group —</option>
          ${S.groups.map((g,i)=>`<option value="${i}" ${S.myGroup===i?'selected':''}>${groupLabel(g,i)}</option>`).join("")}
@@ -695,15 +781,7 @@ function renderPlayer(){
       }
     }
   }
-  let hist="";
-  if(n>0){
-    hist=`<div class="card"><table class="holes"><tr><th>Hole</th><th>Holed out</th><th>+/− par</th></tr>`+
-      Array.from({length:n},(_,k)=>{
-        if(g.fin[k]==null) return `<tr onclick="editFinish(${gi},${k})"><td class="num">${holeSeq(g,k)}</td><td class="muted">– tap to set</td><td></td></tr>`;
-        const diff=g.fin[k]-(start+cumParG(g,k+1));
-        return `<tr onclick="editFinish(${gi},${k})"><td class="num">${holeSeq(g,k)}</td><td class="num">${hm(g.fin[k])}</td><td class="num ${diff>0?'tm':'tp'}">${signed(diff)}</td></tr>`;
-      }).join("")+`</table></div>`;
-  }
+  const hist=scheduleGrid(gi);
   p.innerHTML=`
     <div class="status-hero st-${st.code}">
       <div class="word">${statusWord(st.code)}</div>
@@ -820,7 +898,9 @@ function parseRounds(txt){
 }
 let pending=null; // [{label, groups:[{start,startHole,holes,players}]}]
 function parsePaste(){
-  const r=parseRounds($('pasteBox').value);
+  const txt=$('pasteBox').value;
+  if(isShotgun(txt)){ shotgunFlow(txt); return; }
+  const r=parseRounds(txt);
   if(!r.length){ alert("Couldn't find tee times in that text. Each group needs a time like 8:00 or 8:00 am — or use the Manual tab."); return; }
   pending=r; renderPreview();
 }
@@ -863,6 +943,7 @@ function normGroups(pg){
   const gs=pg.map(p=>({ start:hm(toMin(p.start)==null?480:toMin(p.start)),
                         startHole:Math.min(Math.max(+p.startHole||1,1),ch),
                         holes:Math.min(Math.max(+p.holes||dh,1),36),
+                        name:p.name||null,
                         players:(p.players||[]).map(flipName) }));
   gs.sort((a,b)=>(toMin(a.start)-toMin(b.start))||(a.startHole-b.startHole));
   return gs;
@@ -874,7 +955,7 @@ function goLive(label,pg){
     S.records.unshift(snapshotRound());
     S.log=[];
   }
-  S.groups=normGroups(pg).map((p,i)=>({ id:Date.now()+i, name:"Group "+(i+1), players:p.players,
+  S.groups=normGroups(pg).map((p,i)=>({ id:Date.now()+i, name:p.name||("Group "+(i+1)), players:p.players,
       start:p.start, startHole:p.startHole, holes:p.holes, fin:Array(36).fill(null), lastStatus:null }));
   S.myGroup=null;
   logAdd("—",`${label||"draw"} loaded: ${S.groups.length} groups, first tee ${S.groups[0].start}`,'');
@@ -952,7 +1033,19 @@ async function parseFile(f){
           if(y!==null&&Math.abs(ty-y)>3){ lines.push(line.join("  ")); line=[]; } y=ty; line.push(it.str); });
         lines.push(line.join("  ")); text+=lines.join("\n")+"\n";
       }
+    }else if(f.type.startsWith("image/")||["png","jpg","jpeg","webp","heic","gif"].includes(ext)){
+      msg.textContent="Reading text from the photo — this can take 10–20 seconds…";
+      if(!window.Tesseract) await lib("https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js");
+      const res=await Tesseract.recognize(f,'eng',{logger:m=>{ if(m.status==='recognizing text') msg.textContent="Reading photo… "+Math.round((m.progress||0)*100)+"%"; }});
+      text=res.data.text||"";
+      if(text.trim().length<10){ msg.textContent="Couldn't read text from that image — try a straighter, clearer photo, or paste the draw text."; return; }
+      /* OCR isn't perfect: show for review in the Paste tab rather than importing blind */
+      $('pasteBox').value=text; drawTab('paste');
+      msg.textContent="";
+      toast("Check the text, then tap Read draw");
+      return;
     }else{ msg.textContent="Unsupported file type — paste the draw text instead."; return; }
+    if(isShotgun(text)){ msg.textContent=""; shotgunFlow(text); return; }
     const r=parseRounds(text);
     if(!r.length){ msg.textContent="Read the file but couldn't find tee times. Try pasting the draw text instead."; return; }
     msg.textContent="";
@@ -1183,6 +1276,130 @@ function applyRole(){
 }
 const OFFICIAL_ONLY=['draw','log','more','group'];
 
+/* ================= SHARE (QR / link) =================
+   The whole live event (draw + settings, incl. the admin PIN hash so player
+   phones stay locked) is packed into the URL after #e=. Scanning opens the
+   app with the event loaded, in player mode. */
+function packEvent(){
+  const p={ v:1, s:{n:S.settings.name,d:S.settings.date,i:S.settings.interval,c:S.settings.courseHoles,
+            tp:S.settings.timePar.slice(0,CH()),a:S.settings.thAmber,r:S.settings.thRed,t:S.settings.teamsEvent?1:0,p:S.settings.pin||null},
+    g:S.groups.map(g=>[g.start,g.startHole||1,gHoles(g),g.players]) };
+  const b=btoa(unescape(encodeURIComponent(JSON.stringify(p)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  return location.origin+location.pathname+"#e="+b;
+}
+function unpackEvent(hash){
+  const m=hash.match(/#e=([A-Za-z0-9\-_]+)/); if(!m) return null;
+  try{
+    const b=m[1].replace(/-/g,'+').replace(/_/g,'/');
+    const p=JSON.parse(decodeURIComponent(escape(atob(b+'=='.slice(0,(4-b.length%4)%4)))));
+    if(!p.g) return null;
+    return p;
+  }catch(e){ return null; }
+}
+function applyShared(p){
+  S.settings.name=p.s.n||""; S.settings.date=p.s.d||S.settings.date;
+  S.settings.interval=p.s.i||9; S.settings.courseHoles=p.s.c||18;
+  (p.s.tp||[]).forEach((v,i)=>S.settings.timePar[i]=+v||14);
+  S.settings.thAmber=p.s.a||3; S.settings.thRed=p.s.r||8;
+  S.settings.teamsEvent=!!p.s.t;
+  if(p.s.p) S.settings.pin=p.s.p;      // event PIN guards official mode on this phone
+  S.groups=p.g.map((a,i)=>({id:Date.now()+i,name:"Group "+(i+1),start:a[0],startHole:a[1],holes:a[2],
+    players:(a[3]||[]).map(flipName),fin:Array(36).fill(null),lastStatus:null}));
+  S.myGroup=null;
+  if(S.role!=='official') S.role='player';
+  save();
+}
+function checkSharedLink(){
+  const p=unpackEvent(location.hash); if(!p) return false;
+  if(S.groups.length && hasTimes()){
+    if(!confirm("This link contains an event. Load it? Your current round's times will be replaced (Cancel keeps them).")){ history.replaceState(null,"",location.pathname); return false; }
+  }
+  applyShared(p);
+  history.replaceState(null,"",location.pathname);   // tidy the URL
+  toast("Event loaded from link");
+  return true;
+}
+function makeQR(){
+  if(!S.groups.length){ alert("Load a draw first."); return; }
+  const url=packEvent();
+  $('qrWrap').style.display='block';
+  $('qrUrl').textContent=url;
+  $('qrMsg').textContent = url.length>2300 ? "Long draw — the QR may be dense; the copy-link button always works (share by text/WhatsApp)." : "";
+  const box=$('qrBox'); box.innerHTML="";
+  const draw=()=>{ try{ new QRCode(box,{text:url,width:220,height:220,correctLevel:QRCode.CorrectLevel.L}); }
+                   catch(e){ box.textContent="QR too dense — use Copy link instead."; } };
+  if(window.QRCode) draw();
+  else lib("https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js").then(draw)
+        .catch(()=>{ box.textContent="QR needs internet once — Copy link still works."; });
+}
+function copyShare(){
+  const url=$('qrUrl').textContent;
+  (navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject()).then(()=>toast("Link copied"))
+    .catch(()=>{ prompt("Copy this link:",url); });
+}
+function printQR(){
+  const ev=esc(S.settings.name||"Golf event");
+  $('printArea').innerHTML=`<div style="text-align:center;padding:40px 0">
+    <div style="font-size:26px;font-weight:800">${ev}</div>
+    <div style="color:#666;margin:6px 0 24px">${esc(S.settings.date||"")}</div>
+    <div style="display:flex;justify-content:center">${$('qrBox').innerHTML}</div>
+    <div style="font-size:18px;margin-top:20px">Scan to see your tee time &amp; pace schedule</div></div>`;
+  window.print();
+}
+
+/* ================= PRINT SCHEDULE SHEETS ================= */
+function printSchedules(){
+  if(!S.groups.length){ alert("No groups to print."); return; }
+  const sheets=S.groups.map((g,i)=>{
+    const gh=gHoles(g), start=toMin(g.start);
+    let rows="";
+    for(let k=0;k<gh;k++){
+      rows+=`<tr><td>${holeSeq(g,k)}</td><td>${hm(start+cumParG(g,k))}</td><td>${hm(start+cumParG(g,k+1))}</td></tr>`;
+    }
+    return `<div class="psheet">
+      <b>${i+1}. ${esc(g.players.join(', ')||g.name)}</b>
+      <div style="font-size:12px;color:#555;margin:2px 0 8px">Tee ${hm(start)} · start hole ${g.startHole||1} · ${gh} holes</div>
+      <table><tr><th>Hole</th><th>Tee off</th><th>Finish by</th></tr>${rows}</table>
+    </div>`;
+  }).join("");
+  $('printArea').innerHTML=`<div style="margin-bottom:14px"><b style="font-size:18px">${esc(S.settings.name||"Pace of play schedules")}</b> — ${esc(S.settings.date||"")}</div>`+sheets;
+  window.print();
+}
+
+/* ================= SHOTGUN DRAWS =================
+   "Hole 12  Team Mohi — J Smith, A Brown" style: one tee time for the whole
+   field, start holes per line, optional "(2nd Group)" second wave. */
+function isShotgun(txt){
+  const holeLines=(txt.match(/^\s*hole\s+\d+/gim)||[]).length;
+  const times=(txt.match(/\b\d{1,2}[:.]\d{2}\s*(am|pm)?\b/gi)||[]).length;
+  return holeLines>=3 && times<=2;
+}
+function shotgunFlow(txt){
+  const stm=txt.match(/start[:\s]+(\d{1,2}[:.]\d{2}\s*(?:am|pm)?)/i);
+  const t1=prompt("Shotgun draw detected — tee time for the field? (e.g. 8:45 am)", stm?stm[1]:"8:45 am");
+  if(t1===null||toMin(t1)==null){ if(t1!==null) alert("Couldn't read that time."); return; }
+  let t2=null;
+  if(/\(2nd/i.test(txt)){
+    t2=prompt("This draw has a 2nd wave — its tee time? (e.g. 11:00 am)","");
+    if(t2!==null && toMin(t2)==null) t2=null;
+  }
+  const dh = CH()===9 ? 9 : (prompt("Holes each group plays? (9 or 18)","9")==="18"?18:9);
+  const groups=[];
+  txt.split(/\r?\n/).forEach(line=>{
+    const m=line.match(/^\s*hole\s+(\d{1,2})\s*(\(2nd[^)]*\))?\s*(.*)$/i);
+    if(!m) return;
+    let rest=m[3].trim(), team="";
+    const dm=rest.match(/^(.*?)\s*[—–:-]\s+(.*)$/);           // "Team Mohi — players..."
+    if(dm && dm[2].trim()){ team=dm[1].trim(); rest=dm[2]; }
+    const players=splitPlayers(rest);
+    if(!players.length && !rest) return;
+    groups.push({ start: (m[2]&&t2)? t2 : t1, startHole:+m[1], holes:dh, players, name:team||null });
+  });
+  if(!groups.length){ alert("Found 'Hole N' lines but no team/player names — check the text."); return; }
+  pending=[{label:"Shotgun round",groups}];
+  renderPreview();
+}
+
 /* ================= NAV / INIT ================= */
 function show(s){
   if(S.role==null && s!=='role') s='role';
@@ -1201,10 +1418,15 @@ function renderAll(){
   renderHeader(); renderField(); renderPlayer(); renderDrawCurrent(); renderUpcoming(); renderLog(); renderRecords();
   if($('scr-group').classList.contains('on')) renderGroup();
 }
+const fromLink=checkSharedLink();
 renderSettings(); renderAll(); applyRole();
-show(S.role==null ? 'role' : S.role==='official' ? (S.groups.length?'field':'draw') : 'player');
+show(fromLink ? 'player' : S.role==null ? 'role' : S.role==='official' ? (S.groups.length?'field':'draw') : 'player');
 /* Keep 'due by' clocks, pending statuses and player schedule nudges fresh */
-setInterval(()=>{ if(document.visibilityState==='visible'){ renderField(); renderPlayer(); } }, 30000);
+setInterval(()=>{ if(document.visibilityState!=='visible') return;
+  renderField();
+  if(document.activeElement?.id!=='pSearch') renderPlayer();
+}, 30000);
+setInterval(()=>{ const c=$('pClock'); if(c) c.textContent=hm(nowMin()); }, 15000);
 /* Offline support once hosted (e.g. GitHub Pages) */
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
