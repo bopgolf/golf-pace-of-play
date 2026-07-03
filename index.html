@@ -758,14 +758,10 @@ function saveEdit() {
 let pendingShotgunText = null;
 
 function isShotgunDraw(text) {
-  // Must have "Hole N [optional (2nd Group)] TeamName" pattern
   const hasShotgunPattern = /Hole\s+\d+\s*(?:\(2nd\s+Group\))?\s+[A-Za-z]/i.test(text);
   if (!hasShotgunPattern) return false;
-  // A timed (non-shotgun) draw has times directly before player names like "10:00AM Mohi,"
-  // Shotgun draws only have times in headers like "Start: 8:15am" or "Finish: 12pm"
   const hasTeeTimes = /\d{1,2}:\d{2}\s*(?:AM|PM)\s+[A-Z][a-z]+[,\s]/i.test(text);
   if (hasTeeTimes) return false;
-  // Extra check: must have at least 3 "Hole N" entries to be a real shotgun draw
   const holeCount = (text.match(/Hole\s+\d+/gi)||[]).length;
   return holeCount >= 3;
 }
@@ -793,7 +789,6 @@ function updateWave2Suggestion() {
   const [h,m] = start.split(':').map(Number);
   const w2mins = h*60+m+holes*interval;
   const w2 = String(Math.floor(w2mins/60)%24).padStart(2,'0')+':'+String(w2mins%60).padStart(2,'0');
-  // Only auto-fill if user hasn't manually changed it yet
   const w2Input = document.getElementById('shotgun-start2');
   if (!w2Input.dataset.touched) w2Input.value = w2;
 }
@@ -825,7 +820,6 @@ function parseShotgunDraw(text, startTime, holes, wave2Time) {
   for (const part of parts) {
     const hm = part.match(/^Hole\s+(\d+)\s*(\(2nd\s+Group\))?/i);
     if (!hm) continue;
-    // Skip header rows that start with "STARTING", "TEAMS" etc
     const afterHole = part.replace(/^Hole\s+\d+\s*(\(2nd\s+Group\))?\s*/i,'').trim();
     if (/^STARTING|^TEAMS|^Players/i.test(afterHole)) continue;
     const holeNum = parseInt(hm[1]);
@@ -871,14 +865,12 @@ function parseShotgunDraw(text, startTime, holes, wave2Time) {
 // INTERCLUB FOURSOMES (Tee #1 / Tee #2 parallel matches)
 // ═══════════════════════════════════════════════
 function isInterclubDraw(text) {
-  // Looks for "TIME  Club  N&N  v  Club  N&N" pattern (tab or multi-space separated)
   return /\d{1,2}:\d{2}[\t\s]+[A-Za-z][A-Za-z\s]*?[\t\s]+\d+&\d+[\t\s]+v[\t\s]+[A-Za-z]/i.test(text);
 }
 
 function parseInterclubDraw(text) {
   const groups = [];
   const lines = text.split(/\r?\n/).filter(l => l.trim() && !/^Tee\s*#/i.test(l.trim()));
-  // Match: TIME  TeamA  N&N  v  TeamB  N&N  (separated by tabs or 2+ spaces)
   const rx = /(\d{1,2}:\d{2})[\t ]{1,}([A-Za-z][A-Za-z'\.\s]*?)[\t ]{2,}(\d+&\d+)[\t ]+v[\t ]+([A-Za-z][A-Za-z'\.\s]*?)[\t ]{2,}(\d+&\d+)/g;
   let gnum = 1;
   lines.forEach(line => {
@@ -940,7 +932,6 @@ function parseTeeSheetExport(text) {
         const hm = line.match(/Playing\s+(\d+)\s+Holes/i);
         holeCounts.push(parseInt(hm[1]));
       }
-      // else: metadata line (Cart Booked, Cart Exemption etc) - ignore
     }
     let holesCount = 18;
     if (holeCounts.length) {
@@ -963,7 +954,6 @@ function parseTeeSheetExport(text) {
 
 // ═══════════════════════════════════════════════
 // CLUB MATCHPLAY (singles with member numbers)
-// "8:00 Ray Dumble 300 1621 8 v Tom McKeown 217 1650 8"
 // ═══════════════════════════════════════════════
 function isPlayerMatchDraw(text) {
   return /\d{1,2}:\d{2}\s+[A-Za-z][a-zA-Z'\-]*(?:\s+[A-Za-z][a-zA-Z'\-]*)+\s+\d{2,3}\s+\d{2,4}\s+\d+\s+v\s+/.test(text);
@@ -1054,10 +1044,7 @@ async function importPDF(e) {
     if (!lib) throw new Error('PDF library failed to load — check your internet connection and try again');
     lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     const pdf = await lib.getDocument({data:buf}).promise;
-    // Simple left-to-right, top-to-bottom text join (works for most single-column draws)
     let text = '';
-    // Positionally-ordered text (groups items into visual rows by Y, sorts by X within row)
-    // This handles multi-column layouts like finals draws with side-by-side divisions
     let orderedText = '';
     for (let i=1;i<=pdf.numPages;i++) {
       const pg = await pdf.getPage(i);
@@ -1097,7 +1084,6 @@ async function importPDF(e) {
     } else if (isInterclubDraw(text)) {
       finishImport(ev, parseInterclubDraw(text));
     } else if (isShotgunDraw(text)) {
-      // Extract start time from PDF if present
       const stm = text.match(/Start[:\s]+(\d{1,2}:\d{2}\s*(?:am|pm)?)/i);
       if (stm) {
         const raw = stm[1].trim();
@@ -1106,7 +1092,6 @@ async function importPDF(e) {
           let h=parseInt(tm[1]),m=parseInt(tm[2]);
           if(tm[3]&&/pm/i.test(tm[3])&&h!==12) h+=12;
           if(tm[3]&&/am/i.test(tm[3])&&h===12) h=0;
-          // Show found time as suggestion but don't use it as tee time
           document.getElementById('shotgun-start').value = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
         }
       }
@@ -1117,7 +1102,6 @@ async function importPDF(e) {
       if (fallback.length) {
         finishImport(ev, fallback);
       } else {
-        // Nothing matched - show extracted text so it can be reviewed/fixed and reported
         document.getElementById('paste-text').value = orderedText.trim();
         document.getElementById('paste-form').style.display = 'block';
         setStatus('amber', "Couldn't auto-detect this draw's format. Here's the text read from the PDF — please share this with support, or edit and click Import to try matching it manually.");
@@ -1147,7 +1131,6 @@ async function importImage(e) {
     if (!text || text.trim().length < 10) {
       throw new Error('Could not read any text from this image. Try a clearer, less angled photo, or use Paste text instead.');
     }
-    // Show the OCR'd text for review before importing - OCR isn't perfect
     document.getElementById('paste-text').value = text;
     document.getElementById('paste-form').style.display = 'block';
     setStatus('green', 'Text extracted — please check it looks right below, then click Import. Fix any typos first if needed.');
@@ -1254,7 +1237,6 @@ function finishImport(ev, groups, fromAI=false){
   const n18=groups.filter(g=>g.holesCount===18).length;
   const n9=groups.filter(g=>g.holesCount===9).length;
   setStatus('green',`${groups.length} groups imported${fromAI?' (AI)':''} — ${n18}×18 hole, ${n9}×9 hole`);
-  // Auto-switch to draw tab
   goTab('draw',document.querySelectorAll('.tab')[1]);
 }
 
@@ -1293,9 +1275,6 @@ function calcTimes(teeTime, startHole, holesCount){
   const res=[];
   let cum=0;
   for(let i=0;i<holesCount;i++){
-    // Wrap by total holes on course (18) so hole numbers stay correct
-    // e.g. 9 holes from hole 10: 10,11,12,13,14,15,16,17,18
-    // e.g. 9 holes from hole 3 on a 9-hole course: 3,4,5,6,7,8,9,1,2
     const holeIdx=(si+i)%totalHoles;
     const interval=db.intervals[holeIdx]||13;
     const t=h*60+m+cum;
@@ -1312,8 +1291,7 @@ function fmt(mins){
 function nowMins(){ const n=new Date(); return n.getHours()*60+n.getMinutes(); }
 
 // ═══════════════════════════════════════════════
-// FIELD VIEW — where every group SHOULD be right now,
-// calculated purely from tee times + intervals (no recording needed)
+// FIELD VIEW
 // ═══════════════════════════════════════════════
 function renderField(){
   const ev=activeEvent();
@@ -1345,8 +1323,7 @@ function renderField(){
 }
 
 // ═══════════════════════════════════════════════
-// ACTUAL PACE — players tap when they hole out; stored on this phone,
-// keyed by event + tee time + start hole so it survives refresh & QR links
+// ACTUAL PACE
 // ═══════════════════════════════════════════════
 const FIN_KEY='golfpop_fin_v1';
 let finStore={};
@@ -1407,8 +1384,6 @@ function setSearchTab(tab){
 
 function populatePlayerDropdowns(){
   const ev=activeEvent(); if(!ev) return;
-  // Player search - type-ahead (no dropdown, just live search)
-  // Tee time select
   const times=[...new Set(ev.groups.map(g=>g.teeTime))].sort();
   const tsel=document.getElementById('tee-select');
   tsel.innerHTML='<option value="">— Select —</option>'+times.map(t=>`<option value="${t}">${t}</option>`).join('');
@@ -1419,14 +1394,12 @@ function doPlayerSearch(){
   const q=(document.getElementById('player-search').value||'').toLowerCase().trim();
   const sugg=document.getElementById('name-suggestions');
   if(q.length<2){ sugg.innerHTML=''; document.getElementById('player-result').innerHTML=''; return; }
-  // Find matching players
   const matches=[];
   ev.groups.forEach(g=>g.players.forEach(p=>{ if(p.toLowerCase().includes(q)&&!matches.includes(p)) matches.push(p); }));
   if(matches.length===0){ sugg.innerHTML=''; showPlayerResult(q); return; }
   sugg.innerHTML=matches.slice(0,6).map(p=>`
     <div onclick="selectPlayer('${p.replace(/'/g,"\\'")}',this)" style="padding:8px 12px;background:var(--bg2);border-radius:var(--r);margin-bottom:4px;cursor:pointer;font-size:14px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg2)'">${p}</div>
   `).join('');
-  // If exact match just show result
   if(matches.length===1) showPlayerResult(matches[0]);
 }
 
@@ -1491,7 +1464,6 @@ function renderTeeCard(g, showClock, ci){
     }
   }
 
-  // Actual pace from the player's own taps (schedule = plan; taps = truth)
   let pace='';
   if(showClock && ci!=null){
     if(nFin>0){
@@ -1557,7 +1529,7 @@ function t2m(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
 
 function buildShareUrl(evId){
   const ev=db.events.find(e=>e.id===evId); if(!ev||!ev.groups.length) return '';
-  const payload={n:ev.name,c:ev.course||'',d:ev.date||'',i:db.intervals[0],
+  const payload={n:ev.name,c:ev.course||'',d:ev.date||'',i:db.intervals,
     g:ev.groups.map(g=>({t:t2m(g.teeTime),s:g.startHole,h:g.holesCount,p:g.players.map(compressName),n:g.name}))};
   const b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
   const enc=b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
@@ -1582,14 +1554,12 @@ function updateShareQR(){
   if(!url){ empty.style.display='block'; section.style.display='none'; return; }
   empty.style.display='none'; section.style.display='block';
   document.getElementById('share-url-display').textContent=url;
-  // QR
   ['qr-canvas','poster-qr'].forEach((id,i)=>{
     const el=document.getElementById(id);
     el.innerHTML='';
     try{ new QRCode(el,{text:url,width:i?220:200,height:i?220:200,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M}); }
     catch(e){ el.textContent='QR error'; }
   });
-  // Poster
   if(ev){ document.getElementById('poster-title').textContent=ev.name; document.getElementById('poster-sub').textContent=[ev.course,ev.date].filter(Boolean).join(' · '); }
 }
 
@@ -1683,7 +1653,6 @@ function tickClock(){
   if(fsec&&fsec.classList.contains('active')) renderField();
   const ps=document.getElementById('sec-player');
   if(ps&&ps.classList.contains('active')){
-    // Refresh visible result quietly
     if(searchTab==='name'){
       const q=document.getElementById('player-search').value;
       if(q.length>=2) showPlayerResult(q);
